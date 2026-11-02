@@ -1,0 +1,110 @@
+{
+  "entities": {
+    "Boarder": {
+      "title": "Boarder",
+      "description": "A mess member/boarder profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "roomNo": { "type": "string" },
+        "phone": { "type": "string" },
+        "isActive": { "type": "boolean" },
+        "joinedDate": { "type": "string" }
+      },
+      "required": ["id", "name", "isActive", "joinedDate"]
+    },
+    "Deposit": {
+      "title": "Deposit",
+      "description": "A cash or digital deposit made by a boarder",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "boarderId": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string" },
+        "note": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "boarderId", "amount", "date"]
+    },
+    "BazaarCost": {
+      "title": "BazaarCost",
+      "description": "A bazaar grocery expense entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "date": { "type": "string" },
+        "amount": { "type": "number" },
+        "description": { "type": "string" },
+        "spentById": { "type": "string" }
+      },
+      "required": ["id", "date", "amount", "description", "spentById"]
+    },
+    "DailyMealLog": {
+      "title": "DailyMealLog",
+      "description": "Daily meal consumption attendance register",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string" },
+        "meals": { "type": "object" },
+        "note": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["date", "meals"]
+    },
+    "MiscellaneousCosts": {
+      "title": "MiscellaneousCosts",
+      "description": "Shared fixed bills and utility expenses",
+      "type": "object",
+      "properties": {
+        "cookerBill": { "type": "number" },
+        "utilityBill": { "type": "number" },
+        "gasBill": { "type": "number" },
+        "wifiBill": { "type": "number" },
+        "houseRent": { "type": "number" },
+        "otherCosts": { "type": "number" },
+        "customBills": { "type": "array" }
+      },
+      "required": ["cookerBill", "utilityBill", "gasBill", "wifiBill", "houseRent", "otherCosts"]
+    },
+    "MessSettings": {
+      "title": "MessSettings",
+      "description": "Mess global settings and budget targets",
+      "type": "object",
+      "properties": {
+        "messName": { "type": "string" },
+        "currentMonth": { "type": "string" },
+        "managerPin": { "type": "string" },
+        "monthlyBudgetTarget": { "type": "number" }
+      },
+      "required": ["messName", "currentMonth"]
+    }
+  },
+  "firestore": {
+    "/boarders/{boarderId}": {
+      "schema": { "$ref": "#/entities/Boarder" },
+      "description": "Boarder member profiles"
+    },
+    "/deposits/{depositId}": {
+      "schema": { "$ref": "#/entities/Deposit" },
+      "description": "Boarder cash and digital deposit transactions"
+    },
+    "/bazaarCosts/{bazaarId}": {
+      "schema": { "$ref": "#/entities/BazaarCost" },
+      "description": "Daily and periodic bazaar grocery expenses"
+    },
+    "/mealLogs/{date}": {
+      "schema": { "$ref": "#/entities/DailyMealLog" },
+      "description": "Daily meal log entries indexed by date YYYY-MM-DD"
+    },
+    "/miscCosts/{docId}": {
+      "schema": { "$ref": "#/entities/MiscellaneousCosts" },
+      "description": "Shared monthly fixed bills"
+    },
+    "/settings/{docId}": {
+      "schema": { "$ref": "#/entities/MessSettings" },
+      "description": "Mess system settings and budget targets"
+    }
+  }
+}

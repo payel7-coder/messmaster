@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == "huzaifaduet@gmail.com" || request.auth.token.email_verified == true);
+    }
+
+    // Public read for boarders and transparency, write for manager operations
+    match /boarders/{boarderId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /deposits/{depositId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /bazaarCosts/{bazaarId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /mealLogs/{date} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /miscCosts/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if true;
+    }
+  }
+}

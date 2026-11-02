@@ -1,0 +1,6 @@
+{
+  "name": "Mess Meal Manager",
+  "description": "A streamlined meal management app for mess operations, featuring daily meal tracking, deposit logs, utility bills, manager dashboard, and printable detailed monthly bills.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
