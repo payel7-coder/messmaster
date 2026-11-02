@@ -1,6 +1,12 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { 
+  getAuth, 
+  GoogleAuthProvider, 
+  signInWithPopup, 
+  signOut as firebaseSignOut, 
+  User 
+} from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 
 // Initialize Firebase App
@@ -12,6 +18,19 @@ export const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestore
   : getFirestore(app);
 
 export const auth = getAuth(app);
+
+// Google Sign-In Provider
+export const googleAuthProvider = new GoogleAuthProvider();
+googleAuthProvider.setCustomParameters({ prompt: 'select_account' });
+
+export async function signInManagerWithGoogle(): Promise<User> {
+  const result = await signInWithPopup(auth, googleAuthProvider);
+  return result.user;
+}
+
+export async function signOutManager(): Promise<void> {
+  await firebaseSignOut(auth);
+}
 
 // Connection test on boot as recommended by Firebase guidelines
 export async function testFirestoreConnection(): Promise<boolean> {

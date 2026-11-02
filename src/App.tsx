@@ -32,7 +32,8 @@ import {
 import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings } from './types';
 import { calculateReport } from './utils';
 import { INITIAL_SETTINGS, INITIAL_MISC_COSTS, generateSampleData } from './data';
-import { testFirestoreConnection } from './firebase';
+import { testFirestoreConnection, auth, signOutManager } from './firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { 
   loadInitialData, 
   subscribeToFirestoreUpdates, 
@@ -59,6 +60,12 @@ export default function App() {
     return localStorage.getItem('mess_manager_auth') === 'true' ||
            sessionStorage.getItem('mess_manager_auth') === 'true';
   });
+  const [googleUser, setGoogleUser] = useState<{
+    displayName: string | null;
+    email: string | null;
+    photoURL: string | null;
+    uid: string;
+  } | null>(null);
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showWipeModal, setShowWipeModal] = useState<boolean>(false);
 
@@ -325,8 +332,25 @@ export default function App() {
       },
     });
 
+    // Listen to Firebase Google Auth state across reloads/sessions
+    const authUnsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setGoogleUser({
+          displayName: firebaseUser.displayName,
+          email: firebaseUser.email,
+          photoURL: firebaseUser.photoURL,
+          uid: firebaseUser.uid,
+        });
+        setIsManagerAuthenticated(true);
+        localStorage.setItem('mess_manager_auth', 'true');
+      } else {
+        setGoogleUser(null);
+      }
+    });
+
     return () => {
       unsubscribe();
+      authUnsubscribe();
     };
   }, []);
 
@@ -371,17 +395,46 @@ export default function App() {
     setShowLoginModal(true);
   };
 
-  const handleLoginSuccess = () => {
+  const handleLoginSuccess = (user?: User) => {
+    if (user) {
+      setGoogleUser({
+        displayName: user.displayName,
+        email: user.email,
+        photoURL: user.photoURL,
+        uid: user.uid,
+      });
+      setCloudToast({
+        message: `Signed in as Manager via Google (${user.email || user.displayName})`,
+        type: 'success'
+      });
+    } else {
+      setCloudToast({
+        message: 'Manager mode unlocked via Security PIN.',
+        type: 'success'
+      });
+    }
     setIsManagerAuthenticated(true);
     setRole('manager');
     setShowLoginModal(false);
+    setTimeout(() => setCloudToast(null), 4000);
   };
 
-  const handleManagerLogout = () => {
+  const handleManagerLogout = async () => {
+    try {
+      await signOutManager();
+    } catch (err) {
+      console.error("Sign out error:", err);
+    }
     localStorage.removeItem('mess_manager_auth');
     sessionStorage.removeItem('mess_manager_auth');
+    setGoogleUser(null);
     setIsManagerAuthenticated(false);
     setRole('boarder');
+    setCloudToast({
+      message: 'Manager mode locked and signed out.',
+      type: 'info'
+    });
+    setTimeout(() => setCloudToast(null), 3000);
   };
 
   const handleRoleChange = (newRole: 'manager' | 'boarder') => {
@@ -544,6 +597,7 @@ export default function App() {
         onSimulateData={handleSimulateData}
         hasData={hasActiveMonthData}
         isManagerAuthenticated={isManagerAuthenticated}
+        googleUser={googleUser}
         onRequireManagerLogin={handleRequireManagerLogin}
         onManagerLogout={handleManagerLogout}
       />
@@ -791,6 +845,73 @@ export default function App() {
               ) : (
                 /* Authenticated Manager Settings Form */
                 <div className="space-y-5">
+                  {/* Google Manager Profile Status Card */}
+                  <div className="bg-slate-50 border border-slate-200/90 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+                    <div className="flex items-center gap-3">
+                      {googleUser?.photoURL ? (
+                        <img
+                          src={googleUser.photoURL}
+                          alt="Google Avatar"
+                          className="w-10 h-10 rounded-full object-cover border-2 border-emerald-500 shadow-xs"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm">
+                          {googleUser?.displayName ? googleUser.displayName.charAt(0).toUpperCase() : <ShieldCheck className="w-5 h-5 text-emerald-600" />}
+                        </div>
+                      )}
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs font-bold text-slate-900">
+                            {googleUser ? (googleUser.displayName || 'Google Manager') : 'Security PIN Manager'}
+                          </span>
+                          {googleUser ? (
+                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                              <svg className="w-2.5 h-2.5" viewBox="0 0 24 24">
+                                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                              </svg>
+                              Google Verified
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-semibold text-slate-600 bg-slate-200/80 px-1.5 py-0.5 rounded-full">
+                              PIN Session
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                          {googleUser?.email || 'Logged in via Master PIN'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!googleUser ? (
+                        <button
+                          type="button"
+                          onClick={handleRequireManagerLogin}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 transition-colors cursor-pointer flex items-center gap-1.5"
+                        >
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                          </svg>
+                          Link Google Account
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleManagerLogout}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer"
+                        >
+                          Sign Out of Google
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1.5">Mess / Hall Name</label>
                     <input
