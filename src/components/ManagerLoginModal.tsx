@@ -14,10 +14,13 @@ import {
   Info,
   Shield,
   User,
-  ArrowRight
+  ArrowRight,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 import { signInManagerWithGoogle } from '../firebase';
 import { User as FirebaseUser } from 'firebase/auth';
+import firebaseConfig from '../../firebase-applet-config.json';
 
 interface ManagerLoginModalProps {
   isOpen: boolean;
@@ -40,6 +43,8 @@ export default function ManagerLoginModal({
   const [pinDigits, setPinDigits] = useState<string[]>(['', '', '', '']);
   const [showPin, setShowPin] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [unauthorizedDomain, setUnauthorizedDomain] = useState<string | null>(null);
+  const [copiedDomain, setCopiedDomain] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -89,7 +94,11 @@ export default function ManagerLoginModal({
       }, 500);
     } catch (err: any) {
       const code = err?.code;
-      if (code === 'auth/popup-closed-by-user') {
+      if (code === 'auth/unauthorized-domain') {
+        const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'payel7-coder.github.io';
+        setUnauthorizedDomain(host);
+        setErrorMsg(`Domain "${host}" needs to be added to Authorized Domains in your Firebase Project Console.`);
+      } else if (code === 'auth/popup-closed-by-user') {
         setErrorMsg('Google sign-in popup was dismissed. Click below to try again.');
       } else if (code === 'auth/cancelled-popup-request') {
         // Ignored
@@ -346,7 +355,79 @@ export default function ManagerLoginModal({
                 </span>
               </button>
 
-              {errorMsg && (
+              {unauthorizedDomain ? (
+                <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 text-xs text-amber-900 space-y-3 animate-fadeIn shadow-xs">
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
+                    <div>
+                      <h5 className="font-bold text-amber-950 text-sm">Action Required: Authorize Domain in Firebase</h5>
+                      <p className="text-amber-800 text-[11px] mt-0.5 leading-relaxed">
+                        Google OAuth blocks sign-ins until your website domain is whitelisted in Firebase Console under project <span className="font-bold text-amber-950">{firebaseConfig.projectId}</span>.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Copyable Domain box */}
+                  <div className="flex items-center gap-2 bg-white border border-amber-300 rounded-xl p-2.5">
+                    <code className="flex-1 font-mono text-xs font-bold text-slate-900 select-all truncate">
+                      {unauthorizedDomain}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (unauthorizedDomain) {
+                          navigator.clipboard.writeText(unauthorizedDomain);
+                          setCopiedDomain(true);
+                          setTimeout(() => setCopiedDomain(false), 3000);
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold px-3 py-1.5 rounded-lg text-xs cursor-pointer transition-colors shrink-0"
+                    >
+                      {copiedDomain ? (
+                        <>
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Copy Domain</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Step by step guide */}
+                  <ol className="list-decimal list-inside text-[11px] text-amber-900 space-y-1 bg-amber-100/60 p-2.5 rounded-xl border border-amber-200">
+                    <li>Open <strong>Authentication → Settings → Authorized domains</strong> in Firebase.</li>
+                    <li>Click <strong>Add domain</strong>, paste <code className="font-bold font-mono text-slate-900">{unauthorizedDomain}</code>, and click <strong>Save</strong>.</li>
+                  </ol>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
+                    <a
+                      href={`https://console.firebase.google.com/project/${firebaseConfig.projectId}/authentication/settings`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full sm:flex-1 inline-flex items-center justify-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-3 rounded-xl transition-all shadow-xs text-xs text-center"
+                    >
+                      <span>Open Firebase Console Settings</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('pin');
+                        handleUseDefaultPin();
+                      }}
+                      className="w-full sm:flex-1 inline-flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-3 rounded-xl transition-all shadow-xs cursor-pointer text-xs"
+                    >
+                      <KeyRound className="w-3.5 h-3.5" />
+                      <span>Unlock with PIN (1234) Now</span>
+                    </button>
+                  </div>
+                </div>
+              ) : errorMsg && (
                 <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 text-xs text-rose-800 flex items-start gap-2.5 animate-fadeIn">
                   <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                   <div className="flex-1">
