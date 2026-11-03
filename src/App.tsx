@@ -439,6 +439,13 @@ export default function App() {
     }
   }, [boarders, selectedBoarderId]);
 
+  // Privacy Guard: Prevent boarders from accessing Month-End Bills & Memos tab
+  useEffect(() => {
+    if (role === 'boarder' && activeTab === 'report') {
+      setActiveTab('dashboard');
+    }
+  }, [role, activeTab]);
+
   // --- Mathematical calculations ---
   const report = calculateReport(boarders, deposits, mealLogs, bazaarCosts, miscCosts, settings);
 
@@ -482,6 +489,7 @@ export default function App() {
     setGoogleUser(null);
     setIsManagerAuthenticated(false);
     setRole('boarder');
+    setActiveTab('dashboard');
     setCloudToast({
       message: 'Manager mode locked and signed out.',
       type: 'info'
@@ -498,6 +506,9 @@ export default function App() {
       }
     } else {
       setRole('boarder');
+      if (activeTab === 'report') {
+        setActiveTab('dashboard');
+      }
     }
   };
 
@@ -713,18 +724,21 @@ export default function App() {
               {role === 'manager' ? 'Manager Console' : 'My Dashboard (Public)'}
             </button>
             
-            <button
-              onClick={() => setActiveTab('report')}
-              id="nav-tab-report"
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
-                activeTab === 'report'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <ReceiptText className="w-4 h-4 text-blue-600" />
-              Month-End Bills & Memos
-            </button>
+            {/* Month-End Bills & Memos is strictly restricted to Manager Mode */}
+            {role === 'manager' && (
+              <button
+                onClick={() => setActiveTab('report')}
+                id="nav-tab-report"
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  activeTab === 'report'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <ReceiptText className="w-4 h-4 text-blue-600" />
+                Month-End Bills & Memos
+              </button>
+            )}
 
             <button
               onClick={() => setActiveTab('settings')}
@@ -740,36 +754,38 @@ export default function App() {
             </button>
           </div>
 
-          {/* Cloud Firestore Status Indicator & Actions */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowCloudModal(true)}
-              id="btn-cloud-sync-status"
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer shadow-2xs hover:shadow-sm ${
-                isCloudSynced 
-                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300' 
-                  : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
-              }`}
-              title="Click to view Google Cloud Firestore status, purge browser cache, or force refresh"
-            >
-              <Cloud className={`w-3.5 h-3.5 ${isCloudSynced ? 'text-emerald-600' : 'text-amber-600'} ${isCloudLoading ? 'animate-pulse' : ''}`} />
-              <span className="hidden sm:inline font-bold">Cloud:</span>
-              <span className="font-extrabold">{isCloudLoading ? 'Syncing...' : isCloudSynced ? 'Live Firestore' : 'Offline Cache'}</span>
-              <span className={`w-2 h-2 rounded-full ${isCloudSynced ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-            </button>
-
-            {/* Quick Simulation Badge (Manager only) */}
-            {!hasActiveMonthData && isManagerAuthenticated && (
+          {/* Cloud Firestore Status Indicator & Actions - Strictly for Manager Mode */}
+          {role === 'manager' && isManagerAuthenticated && (
+            <div className="flex items-center gap-2">
               <button
-                onClick={handleSimulateData}
-                id="btn-quick-simulation"
-                className="hidden sm:flex items-center gap-1.5 text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                onClick={() => setShowCloudModal(true)}
+                id="btn-cloud-sync-status"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer shadow-2xs hover:shadow-sm ${
+                  isCloudSynced 
+                    ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300' 
+                    : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+                }`}
+                title="Click to view Google Cloud Firestore status, purge browser cache, or force refresh"
               >
-                <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                Populate Demo Data
+                <Cloud className={`w-3.5 h-3.5 ${isCloudSynced ? 'text-emerald-600' : 'text-amber-600'} ${isCloudLoading ? 'animate-pulse' : ''}`} />
+                <span className="hidden sm:inline font-bold">Cloud:</span>
+                <span className="font-extrabold">{isCloudLoading ? 'Syncing...' : isCloudSynced ? 'Live Firestore' : 'Offline Cache'}</span>
+                <span className={`w-2 h-2 rounded-full ${isCloudSynced ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
               </button>
-            )}
-          </div>
+
+              {/* Quick Simulation Badge (Manager only) */}
+              {!hasActiveMonthData && (
+                <button
+                  onClick={handleSimulateData}
+                  id="btn-quick-simulation"
+                  className="hidden sm:flex items-center gap-1.5 text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                  Populate Demo Data
+                </button>
+              )}
+            </div>
+          )}
 
         </div>
 
@@ -880,6 +896,9 @@ export default function App() {
                   deposits={deposits}
                   mealLogs={mealLogs}
                   allBoarders={boarders}
+                  bazaarCosts={bazaarCosts}
+                  miscCosts={miscCosts}
+                  settings={settings}
                 />
               ) : (
                 <div className="bg-white border border-slate-200 rounded-xl p-8 text-center space-y-4 shadow-xs">
@@ -899,8 +918,8 @@ export default function App() {
             )
           )}
 
-          {/* SCREEN 2: MONTH END REPORTS AND PDFS */}
-          {activeTab === 'report' && (
+          {/* SCREEN 2: MONTH END REPORTS AND PDFS - Strictly Manager Mode */}
+          {activeTab === 'report' && role === 'manager' && (
             <MonthEndReport
               report={report}
               boarders={boarders}
@@ -912,7 +931,7 @@ export default function App() {
               onClearData={() => setShowWipeModal(true)}
               onSimulateData={handleSimulateData}
               onImportBackup={handleImportBackup}
-              isManager={isManagerAuthenticated && role === 'manager'}
+              isManager={isManagerAuthenticated}
               onRequireManagerLogin={handleRequireManagerLogin}
             />
           )}
@@ -1352,85 +1371,87 @@ export default function App() {
                 </div>
               )}
 
-              {/* Cloud Firestore & Browser Cache Management Card */}
-              <div className="mt-6 bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4 mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                      <Cloud className="w-5 h-5" />
+              {/* Cloud Firestore & Browser Cache Management Card - Strictly Manager Mode */}
+              {isManagerAuthenticated && role === 'manager' && (
+                <div className="mt-6 bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4 mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                        <Cloud className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                          Google Cloud Firestore & Cache
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            isCloudSynced 
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}>
+                            {isCloudSynced ? 'Live Synced' : 'Offline / Cached'}
+                          </span>
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          Manage cloud synchronization, purge browser cache, and view live database statistics.
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                        Google Cloud Firestore & Cache
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          isCloudSynced 
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}>
-                          {isCloudSynced ? 'Live Synced' : 'Offline / Cached'}
-                        </span>
-                      </h3>
-                      <p className="text-xs text-slate-500">
-                        Manage cloud synchronization, purge browser cache, and view live database statistics.
-                      </p>
+
+                    <button
+                      onClick={() => setShowCloudModal(true)}
+                      id="btn-open-cloud-sync-modal"
+                      className="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl cursor-pointer transition-all shadow-xs shrink-0"
+                    >
+                      <Database className="w-3.5 h-3.5" />
+                      <span>Open Cloud Manager</span>
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/70 space-y-1">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Database Connection</div>
+                      <div className="font-semibold text-slate-800">Firestore: {firebaseConfig.firestoreDatabaseId || '(default)'}</div>
+                      <div className="text-slate-500 text-[11px]">Last Synced: {lastSyncedAt || 'At boot'}</div>
+                    </div>
+
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/70 space-y-1">
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Storage Statistics</div>
+                      <div className="font-semibold text-slate-800">
+                        {boarders.length} Boarders · {deposits.length} Deposits · {bazaarCosts.length} Bazaar Costs · {mealLogs.length} Meals
+                      </div>
+                      <div className="text-slate-500 text-[11px]">Two-way sync active on changes</div>
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => setShowCloudModal(true)}
-                    id="btn-open-cloud-sync-modal"
-                    className="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl cursor-pointer transition-all shadow-xs shrink-0"
-                  >
-                    <Database className="w-3.5 h-3.5" />
-                    <span>Open Cloud Manager</span>
-                  </button>
-                </div>
+                  <div className="flex flex-wrap items-center gap-2.5 mt-4 pt-3 border-t border-slate-100">
+                    <button
+                      onClick={handleForceRefresh}
+                      disabled={isCloudLoading}
+                      className="flex items-center gap-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isCloudLoading ? 'animate-spin' : ''}`} />
+                      <span>Force Refresh from Cloud</span>
+                    </button>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/70 space-y-1">
-                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Database Connection</div>
-                    <div className="font-semibold text-slate-800">Firestore: {firebaseConfig.firestoreDatabaseId || '(default)'}</div>
-                    <div className="text-slate-500 text-[11px]">Last Synced: {lastSyncedAt || 'At boot'}</div>
+                    <button
+                      onClick={handlePurgeCacheAndReload}
+                      disabled={isCloudLoading}
+                      className="flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Purge Browser Cache & Hard Reload</span>
+                    </button>
+
+                    <button
+                      onClick={handlePushAllToCloud}
+                      disabled={isCloudLoading}
+                      className="flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
+                    >
+                      <UploadCloud className="w-3.5 h-3.5" />
+                      <span>Push Local to Firestore</span>
+                    </button>
                   </div>
-
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/70 space-y-1">
-                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Storage Statistics</div>
-                    <div className="font-semibold text-slate-800">
-                      {boarders.length} Boarders · {deposits.length} Deposits · {bazaarCosts.length} Bazaar Costs · {mealLogs.length} Meals
-                    </div>
-                    <div className="text-slate-500 text-[11px]">Two-way sync active on changes</div>
-                  </div>
                 </div>
-
-                <div className="flex flex-wrap items-center gap-2.5 mt-4 pt-3 border-t border-slate-100">
-                  <button
-                    onClick={handleForceRefresh}
-                    disabled={isCloudLoading}
-                    className="flex items-center gap-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
-                  >
-                    <RefreshCw className={`w-3.5 h-3.5 ${isCloudLoading ? 'animate-spin' : ''}`} />
-                    <span>Force Refresh from Cloud</span>
-                  </button>
-
-                  <button
-                    onClick={handlePurgeCacheAndReload}
-                    disabled={isCloudLoading}
-                    className="flex items-center gap-1.5 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Purge Browser Cache & Hard Reload</span>
-                  </button>
-
-                  <button
-                    onClick={handlePushAllToCloud}
-                    disabled={isCloudLoading}
-                    className="flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
-                  >
-                    <UploadCloud className="w-3.5 h-3.5" />
-                    <span>Push Local to Firestore</span>
-                  </button>
-                </div>
-              </div>
+              )}
 
             </div>
           )}

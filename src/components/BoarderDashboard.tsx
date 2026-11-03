@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   TrendingUp, 
   ArrowUpRight, 
@@ -10,9 +10,14 @@ import {
   FileText,
   CalendarDays,
   CreditCard,
-  Calculator
+  Calculator,
+  Receipt,
+  Printer,
+  X,
+  CheckCircle2,
+  Lock
 } from 'lucide-react';
-import { Boarder, Deposit, DailyMealLog, MonthReport, BoarderSummary } from '../types';
+import { Boarder, Deposit, DailyMealLog, MonthReport, BoarderSummary, MessSettings, BazaarCost, MiscellaneousCosts } from '../types';
 import { formatReadableDate, formatReadableMonth } from '../utils';
 
 interface BoarderDashboardProps {
@@ -21,6 +26,9 @@ interface BoarderDashboardProps {
   deposits: Deposit[];
   mealLogs: DailyMealLog[];
   allBoarders: Boarder[];
+  bazaarCosts?: BazaarCost[];
+  miscCosts?: MiscellaneousCosts;
+  settings?: MessSettings;
 }
 
 export default function BoarderDashboard({
@@ -29,7 +37,12 @@ export default function BoarderDashboard({
   deposits,
   mealLogs,
   allBoarders,
+  bazaarCosts,
+  miscCosts,
+  settings,
 }: BoarderDashboardProps) {
+  const [showSlipModal, setShowSlipModal] = useState(false);
+
   // Find the summary of this specific boarder
   const summary = report.boardersReport.find(r => r.boarderId === boarder.id) || {
     boarderId: boarder.id,
@@ -66,16 +79,16 @@ export default function BoarderDashboard({
     <div className="space-y-6 animate-fadeIn text-slate-800">
       
       {/* Welcome Banner */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 sm:p-8 text-white shadow-xs relative overflow-hidden">
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 sm:p-8 text-white shadow-xs relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-5">
         <div className="absolute inset-0 bg-linear-to-r from-blue-900/40 to-slate-900/10 pointer-events-none" />
-        <div className="relative z-10 max-w-3xl">
+        <div className="relative z-10 max-w-2xl">
           <span className="bg-blue-500/20 text-blue-300 font-semibold text-xs uppercase px-2.5 py-1 rounded-full border border-blue-500/30">
             Boarder Console
           </span>
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mt-3">
             Assalamu Alaikum, {boarder.name}!
           </h2>
-          <p className="text-slate-300 text-sm mt-1.5 max-w-xl leading-relaxed">
+          <p className="text-slate-300 text-sm mt-1.5 leading-relaxed">
             Here is your personal meal statement, ledger, and share of bills for <span className="font-semibold text-white">{formatReadableMonth(report.month)}</span>.
           </p>
           <div className="flex flex-wrap items-center gap-3 mt-2 text-xs">
@@ -90,6 +103,18 @@ export default function BoarderDashboard({
               </span>
             )}
           </div>
+        </div>
+
+        <div className="relative z-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={() => setShowSlipModal(true)}
+            id="btn-boarder-view-slip"
+            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 py-3 rounded-xl cursor-pointer transition-all shadow-md shadow-blue-950/40 active:scale-98"
+          >
+            <Receipt className="w-4 h-4" />
+            <span>View & Print My Voucher Slip</span>
+          </button>
         </div>
       </div>
 
@@ -424,6 +449,162 @@ export default function BoarderDashboard({
         </div>
 
       </div>
+
+      {/* Personal Monthly Voucher Slip Modal for the Boarder */}
+      {showSlipModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 print:p-0 print:bg-white print:static print:overflow-visible animate-fadeIn">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col print:border-none print:shadow-none print:rounded-none">
+            
+            {/* Modal Actions Header (Hidden in Print) */}
+            <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between border-b border-slate-800 print:hidden shrink-0">
+              <div className="flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-blue-400" />
+                <div>
+                  <h3 className="text-sm font-bold text-white">My Monthly Financial Voucher Slip</h3>
+                  <p className="text-[11px] text-slate-400">Personal meal statement & verified expense voucher</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  id="btn-print-personal-slip"
+                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg cursor-pointer transition-colors shadow-xs"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print Slip</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowSlipModal(false)}
+                  id="btn-close-personal-slip"
+                  className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 cursor-pointer transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Official Voucher Slip Printable Card */}
+            <div className="p-6 sm:p-8 bg-slate-50/50 print:bg-white print:p-0">
+              <div className="bg-white border-2 border-slate-900 rounded-xl p-6 shadow-sm print:shadow-none">
+                {/* Slip Header */}
+                <div className="flex justify-between items-start border-b-2 border-slate-900 pb-3">
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900 uppercase tracking-wide">
+                      {settings?.messName || 'Mess'}
+                    </h2>
+                    <p className="text-xs font-semibold text-slate-600 uppercase tracking-wider mt-0.5">
+                      Official Monthly Meal Voucher & Financial Slip
+                    </p>
+                    <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500 font-mono">
+                      <span>Month: <strong>{formatReadableMonth(report.month)}</strong></span>
+                      {boarder.roomNo && (
+                        <>
+                          <span>•</span>
+                          <span>Room: <strong>{boarder.roomNo}</strong></span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <span className={`text-xs font-extrabold px-3 py-1 rounded-md border font-mono tracking-wider ${
+                    summary.balance >= 0 
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
+                      : 'bg-rose-50 text-rose-800 border-rose-300'
+                  }`}>
+                    {summary.balance >= 0 ? 'REFUNDABLE' : 'DUE TO PAY'}
+                  </span>
+                </div>
+
+                {/* Member Profile */}
+                <div className="py-3 border-b border-slate-200 flex justify-between items-center text-xs">
+                  <div>
+                    <span className="text-slate-500">Member Name: </span>
+                    <strong className="text-slate-900 text-sm font-semibold">{boarder.name}</strong>
+                  </div>
+                  {boarder.phone && (
+                    <div className="text-slate-500 font-mono text-[11px]">
+                      Phone: {boarder.phone}
+                    </div>
+                  )}
+                </div>
+
+                {/* Financial Breakdown Table */}
+                <div className="py-3 text-xs space-y-2">
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-600">
+                      1. Meal Consumption ({summary.totalMeals} meals @ ৳{report.mealRate.toFixed(4)}/meal)
+                    </span>
+                    <span className="font-mono font-bold text-slate-900">
+                      ৳ {summary.mealCost.toFixed(2)}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                    <span className="text-slate-600">
+                      2. Shared Overhead Bills (House Rent, Cooker, Gas, Utility, WiFi share)
+                    </span>
+                    <span className="font-mono font-bold text-slate-900">
+                      ৳ {summary.fixedCostShare.toFixed(2)}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center py-1.5 border-b-2 border-slate-200 font-bold text-slate-900 bg-slate-50 px-2 rounded">
+                    <span>Total Charged for Month (1 + 2)</span>
+                    <span className="font-mono text-sm">৳ {summary.totalCost.toFixed(2)}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center py-1 text-blue-700 font-bold px-2">
+                    <span>Total Cash / Bank Deposits Received</span>
+                    <span className="font-mono text-sm">৳ {summary.totalDeposit.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Net Closing Statement */}
+                <div className={`mt-2 p-3 rounded-lg border-2 flex justify-between items-center text-xs ${
+                  summary.balance >= 0 
+                    ? 'bg-emerald-50 text-emerald-950 border-emerald-400' 
+                    : 'bg-rose-50 text-rose-950 border-rose-400'
+                }`}>
+                  <div>
+                    <div className="font-bold text-sm">
+                      {summary.balance >= 0 ? 'Closing Refundable Amount:' : 'Net Outstanding Due:'}
+                    </div>
+                    <div className="text-[10px] opacity-80">
+                      {summary.balance >= 0 
+                        ? 'This surplus credit can be refunded or adjusted in next month.' 
+                        : 'Please clear your dues by the 5th of next month via bKash or Cash.'}
+                    </div>
+                  </div>
+                  <div className="text-xl font-black font-mono">
+                    ৳ {Math.abs(summary.balance).toFixed(2)}
+                  </div>
+                </div>
+
+                {/* Signature Blocks */}
+                <div className="pt-8 mt-6 border-t border-slate-300 flex justify-between items-end text-xs">
+                  <div className="text-center w-40">
+                    <div className="border-t border-slate-800 pt-1 font-bold text-slate-700 text-[11px]">
+                      Boarder Signature
+                    </div>
+                    <div className="text-[9px] text-slate-400">{boarder.name}</div>
+                  </div>
+
+                  <div className="text-center w-40">
+                    <div className="border-t border-slate-800 pt-1 font-bold text-slate-700 text-[11px]">
+                      Manager Verification & Seal
+                    </div>
+                    <div className="text-[9px] text-slate-400">Mess Management</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );

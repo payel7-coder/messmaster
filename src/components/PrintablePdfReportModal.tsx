@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   X, 
   Download, 
@@ -11,8 +11,12 @@ import {
   Building2, 
   Receipt, 
   Calendar,
-  AlertCircle
+  AlertCircle,
+  Sparkles,
+  Languages
 } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport } from '../types';
 import { formatReadableDate, formatReadableMonth } from '../utils';
 import { generateMonthlyReportPdf } from '../utils/pdfGenerator';
@@ -40,7 +44,7 @@ export default function PrintablePdfReportModal({
   miscCosts,
   settings,
 }: PrintablePdfReportModalProps) {
-  // Configuration options
+  const printableAreaRef = useRef<HTMLDivElement>(null);
   const [includeBazaarList, setIncludeBazaarList] = useState(true);
   const [includeFixedCostsBreakdown, setIncludeFixedCostsBreakdown] = useState(true);
   const [includeMemberSlips, setIncludeMemberSlips] = useState(true);
@@ -53,6 +57,7 @@ export default function PrintablePdfReportModal({
   const [activePreviewTab, setActivePreviewTab] = useState<'all' | 'master' | 'slips' | 'bazaar'>('all');
   const [copiedWhatsApp, setCopiedWhatsApp] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isGeneratingUnicodePdf, setIsGeneratingUnicodePdf] = useState(false);
 
   if (!isOpen) return null;
 
@@ -60,6 +65,52 @@ export default function PrintablePdfReportModal({
   const activeBoarders = boarders.filter(b => b.isActive);
   const netMessBalance = report.totalDeposits - (report.totalBazaarCost + report.totalFixedCost);
   const currentMonthBazaars = bazaarCosts.filter(b => b.date.startsWith(report.month));
+
+  // High-Fidelity Unicode & Bangla PDF Export via html2canvas
+  const handleDownloadUnicodePdf = async () => {
+    if (!printableAreaRef.current) return;
+    try {
+      setIsGeneratingUnicodePdf(true);
+      const element = printableAreaRef.current;
+
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: 1200,
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      const imgWidth = pdfWidth;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+      heightLeft -= pdfHeight;
+
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+        heightLeft -= pdfHeight;
+      }
+
+      const cleanMessName = (settings.messName || 'Mess').replace(/[^a-zA-Z0-9\u0980-\u09FF]/g, '_');
+      pdf.save(`${cleanMessName}_Monthly_Report_Bangla_${report.month}.pdf`);
+    } catch (err) {
+      console.error('Unicode PDF generation error:', err);
+      window.print();
+    } finally {
+      setIsGeneratingUnicodePdf(false);
+    }
+  };
 
   // Trigger vector PDF download using jsPDF
   const handleDownloadPdf = () => {
@@ -156,26 +207,40 @@ export default function PrintablePdfReportModal({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
-              onClick={handleDownloadPdf}
-              disabled={isGeneratingPdf}
-              id="btn-modal-download-pdf"
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50"
-              title="Download vector PDF file"
+              type="button"
+              onClick={handleDownloadUnicodePdf}
+              disabled={isGeneratingUnicodePdf}
+              id="btn-modal-download-unicode-pdf"
+              className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+              title="Download high-resolution PDF with complete Bangla (Bengali) font support"
             >
-              <Download className="w-4 h-4" />
-              <span>{isGeneratingPdf ? 'Generating...' : 'Download PDF'}</span>
+              <Languages className="w-4 h-4 text-emerald-200" />
+              <span>{isGeneratingUnicodePdf ? 'Rendering PDF...' : 'Download PDF (Bangla Fonts)'}</span>
             </button>
 
             <button
+              type="button"
               onClick={handleNativePrint}
               id="btn-modal-print-dialog"
-              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs px-3.5 py-2 rounded-xl transition-colors cursor-pointer border border-slate-700"
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-colors cursor-pointer shadow-xs"
               title="Print document or save using browser dialog"
             >
               <Printer className="w-4 h-4" />
               <span>Print / Save as PDF</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf}
+              id="btn-modal-download-pdf"
+              className="hidden sm:flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs px-3 py-2 rounded-xl transition-colors cursor-pointer border border-slate-700 disabled:opacity-50"
+              title="Download compact vector PDF file"
+            >
+              <Download className="w-4 h-4" />
+              <span>{isGeneratingPdf ? 'Generating...' : 'Vector PDF'}</span>
             </button>
 
             <button
@@ -354,6 +419,7 @@ export default function PrintablePdfReportModal({
             {/* The Actual Printable Sheet Paper */}
             <div 
               id="printable-report-area"
+              ref={printableAreaRef}
               className="bg-white text-slate-900 w-full max-w-4xl shadow-md border border-slate-200 p-6 sm:p-10 space-y-7 print:shadow-none print:border-none print:p-0 print:m-0 print:w-full print:max-w-none font-sans"
             >
               
@@ -633,93 +699,153 @@ export default function PrintablePdfReportModal({
                 </section>
               )}
 
-              {/* 5. INDIVIDUAL MEMBER INVOICE SLIPS */}
+              {/* 5. INDIVIDUAL MEMBER INVOICE SLIPS (2 Slips Per A4 Sheet) */}
               {includeMemberSlips && (activePreviewTab === 'all' || activePreviewTab === 'slips') && (
-                <section className="space-y-3 print:break-before-page">
-                  <div className="border-b border-slate-200 pb-1.5 flex justify-between items-center">
+                <section className="space-y-4 print:break-before-page">
+                  <div className="border-b border-slate-200 pb-1.5 flex justify-between items-center print:hidden">
                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <Receipt className="w-4 h-4 text-blue-600 print:hidden" />
-                      5. Individual Member Invoice Slips
+                      <Receipt className="w-4 h-4 text-blue-600" />
+                      5. Individual Member Financial Voucher Slips (2 Per A4 Page)
                     </h3>
-                    <span className="text-[10px] text-slate-400">Cut along dotted borders</span>
+                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      Standard 2-Per-Page A4 Printable Format
+                    </span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {report.boardersReport.map((bSum) => {
+                  <div className="space-y-6">
+                    {report.boardersReport.map((bSum, index) => {
                       const bDetails = boarders.find(b => b.id === bSum.boarderId);
                       const roomNo = bDetails?.roomNo || bSum.roomNo;
                       const isSurplus = bSum.balance >= 0;
+                      const voucherNo = (index + 1).toString().padStart(2, '0');
 
                       return (
-                        <div 
-                          key={bSum.boarderId}
-                          className="border border-dashed border-slate-300 rounded-xl p-4 bg-slate-50/50 flex flex-col justify-between space-y-3 print:break-inside-avoid print:bg-white print:border-slate-400"
-                        >
-                          <div>
-                            <div className="flex justify-between items-start border-b border-slate-200 pb-2">
-                              <div>
-                                <h4 className="font-bold text-xs text-slate-900">{settings.messName || 'Mess'}</h4>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                  <span className="text-[9px] font-mono text-slate-400 uppercase">Monthly Invoice Voucher • {report.month}</span>
-                                  {roomNo && (
-                                    <span className="text-[9px] bg-blue-50 text-blue-700 font-mono font-bold px-1.5 py-0.2 rounded border border-blue-200">
-                                      {roomNo}
+                        <React.Fragment key={bSum.boarderId}>
+                          <div 
+                            className="voucher-two-per-page border-2 border-slate-800 rounded-xl p-5 bg-white flex flex-col justify-between print:border-slate-900 print:p-5 shadow-xs"
+                          >
+                            <div>
+                              {/* Slip Header Banner */}
+                              <div className="flex justify-between items-start border-b-2 border-slate-800 pb-2.5">
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="font-extrabold text-sm sm:text-base text-slate-900 uppercase tracking-wide">
+                                      {settings.messName || 'Mess Meal Manager'}
+                                    </h4>
+                                    <span className="text-[9px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-300 px-1.5 py-0.5 rounded">
+                                      VOUCHER #{voucherNo}
                                     </span>
-                                  )}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-600 font-mono">
+                                    <span>OFFICIAL FINANCIAL MEAL STATEMENT • {activeMonthStr.toUpperCase()}</span>
+                                    {roomNo && (
+                                      <>
+                                        <span>•</span>
+                                        <span>ROOM: <strong>{roomNo}</strong></span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                                <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded border font-mono tracking-wider ${
+                                  isSurplus 
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
+                                    : 'bg-rose-50 text-rose-800 border-rose-300'
+                                }`}>
+                                  {isSurplus ? 'REFUNDABLE / CREDIT' : 'OUTSTANDING DUE'}
+                                </span>
+                              </div>
+
+                              {/* Member Info Strip */}
+                              <div className="flex justify-between items-center py-2 border-b border-slate-200 text-xs">
+                                <div>
+                                  <span className="text-slate-500 font-medium">Member Name: </span>
+                                  <strong className="text-slate-900 font-bold text-sm">{bSum.boarderName}</strong>
+                                  {roomNo && <span className="ml-1 text-[11px] text-slate-500 font-mono">[{roomNo}]</span>}
+                                </div>
+                                {bDetails?.phone && (
+                                  <span className="text-slate-500 font-mono text-[11px]">Contact: {bDetails.phone}</span>
+                                )}
+                              </div>
+
+                              {/* Itemized Calculation Grid */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 py-2.5 text-xs">
+                                <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                                  <span className="text-slate-600">
+                                    1. Meal Consumption ({bSum.totalMeals} meals @ ৳{report.mealRate.toFixed(4)}):
+                                  </span>
+                                  <span className="font-mono font-bold text-slate-900">
+                                    ৳ {bSum.mealCost.toFixed(2)}
+                                  </span>
+                                </div>
+
+                                <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                                  <span className="text-slate-600">
+                                    2. Shared Overhead Bills Share:
+                                  </span>
+                                  <span className="font-mono font-bold text-slate-900">
+                                    ৳ {bSum.fixedCostShare.toFixed(2)}
+                                  </span>
+                                </div>
+
+                                <div className="flex justify-between items-center py-1 font-bold text-slate-900 bg-slate-50 px-2 rounded">
+                                  <span>Total Charged for Month (1 + 2):</span>
+                                  <span className="font-mono">৳ {bSum.totalCost.toFixed(2)}</span>
+                                </div>
+
+                                <div className="flex justify-between items-center py-1 font-bold text-blue-700 bg-blue-50/60 px-2 rounded">
+                                  <span>Total Cash / Bank Deposits:</span>
+                                  <span className="font-mono">৳ {bSum.totalDeposit.toFixed(2)}</span>
                                 </div>
                               </div>
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono ${
-                                isSurplus ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                            </div>
+
+                            {/* Net Balance & Signatures */}
+                            <div className="pt-2 border-t-2 border-slate-800 space-y-3">
+                              <div className={`p-2.5 rounded-lg flex justify-between items-center text-xs font-bold border ${
+                                isSurplus 
+                                  ? 'bg-emerald-50 text-emerald-950 border-emerald-300' 
+                                  : 'bg-rose-50 text-rose-950 border-rose-300'
                               }`}>
-                                {isSurplus ? 'REFUNDABLE' : 'DUE TO PAY'}
-                              </span>
-                            </div>
+                                <span className="font-bold">
+                                  {isSurplus ? 'Closing Refundable Balance (Credit):' : 'Net Outstanding Amount Due (Payable):'}
+                                </span>
+                                <span className="font-mono text-base font-black">
+                                  ৳ {Math.abs(bSum.balance).toFixed(2)}
+                                </span>
+                              </div>
 
-                            <div className="mt-2 text-xs space-y-1">
-                              <div className="flex justify-between items-center font-bold text-slate-800">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span>Member: {bSum.boarderName}</span>
-                                  {roomNo && (
-                                    <span className="text-[9px] bg-slate-200/90 text-slate-700 px-1.5 py-0.2 rounded font-mono font-medium">
-                                      {roomNo}
-                                    </span>
-                                  )}
+                              <div className="flex justify-between items-end text-[10px] text-slate-500 pt-3">
+                                <div className="text-center w-40">
+                                  <div className="border-t border-slate-800 pt-1 font-bold text-slate-800">
+                                    Boarder Signature
+                                  </div>
+                                  <div className="text-[8px] text-slate-400">{bSum.boarderName}</div>
                                 </div>
-                                {bDetails?.phone && <span className="text-slate-500 font-mono text-[10px]">Ph: {bDetails.phone}</span>}
-                              </div>
-                              <div className="flex justify-between text-slate-600 text-[11px] pt-1">
-                                <span>Meals: {bSum.totalMeals} × ৳{report.mealRate.toFixed(2)}</span>
-                                <span className="font-mono">৳ {bSum.mealCost.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between text-slate-600 text-[11px]">
-                                <span>Shared Fixed Bills:</span>
-                                <span className="font-mono">৳ {bSum.fixedCostShare.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between font-semibold text-slate-900 text-[11px] border-t border-slate-200/60 pt-1">
-                                <span>Total Charged:</span>
-                                <span className="font-mono">৳ {bSum.totalCost.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between text-blue-700 font-semibold text-[11px]">
-                                <span>Total Deposited:</span>
-                                <span className="font-mono">৳ {bSum.totalDeposit.toFixed(2)}</span>
+
+                                <div className="text-center w-40">
+                                  <div className="border-t border-slate-800 pt-1 font-bold text-slate-800">
+                                    Manager Verification & Seal
+                                  </div>
+                                  <div className="text-[8px] text-slate-400">Mess Administration</div>
+                                </div>
                               </div>
                             </div>
                           </div>
 
-                          <div className="pt-2 border-t border-slate-200">
-                            <div className={`p-2 rounded-lg flex justify-between items-center text-xs font-bold ${
-                              isSurplus ? 'bg-emerald-50 text-emerald-900 border border-emerald-100' : 'bg-rose-50 text-rose-900 border border-rose-100'
-                            }`}>
-                              <span>{isSurplus ? 'Closing Refund:' : 'Outstanding Due:'}</span>
-                              <span className="font-mono text-sm">৳ {Math.abs(bSum.balance).toFixed(2)}</span>
+                          {/* Perforation Line Between Slip 1 and Slip 2 on the Same Sheet */}
+                          {index % 2 === 0 && index < report.boardersReport.length - 1 && (
+                            <div className="py-2 text-center text-[10px] text-slate-400 font-mono tracking-widest flex items-center justify-center gap-2 print:my-2">
+                              <span className="border-b-2 border-dashed border-slate-300 flex-1"></span>
+                              <span className="px-2">✂ Cut Along Perforation ✂</span>
+                              <span className="border-b-2 border-dashed border-slate-300 flex-1"></span>
                             </div>
+                          )}
 
-                            <div className="flex justify-between text-[8px] text-slate-400 font-bold mt-3 pt-1">
-                              <span className="border-t border-slate-300 w-20 text-center pt-0.5">Boarder Signature</span>
-                              <span className="border-t border-slate-300 w-20 text-center pt-0.5">Manager Signature</span>
-                            </div>
-                          </div>
-                        </div>
+                          {/* Page Break After Every 2 Slips in Print */}
+                          {index % 2 === 1 && index < report.boardersReport.length - 1 && (
+                            <div className="hidden print:block voucher-page-break"></div>
+                          )}
+                        </React.Fragment>
                       );
                     })}
                   </div>
