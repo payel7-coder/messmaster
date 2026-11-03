@@ -10,7 +10,7 @@ import {
   onSnapshot
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
-import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings } from '../types';
+import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, RegisteredManager } from '../types';
 
 // Collection references
 export const BOARDERS_COL = 'boarders';
@@ -19,6 +19,10 @@ export const BAZAAR_COL = 'bazaarCosts';
 export const MEALS_COL = 'mealLogs';
 export const SETTINGS_COL = 'settings';
 export const MISC_COL = 'miscCosts';
+export const MANAGERS_COL = 'managers';
+
+// Primary Root Manager Email
+export const PRIMARY_MANAGER_EMAIL = 'huzaifaduet@gmail.com';
 
 // Default document IDs for singleton configs
 export const GENERAL_DOC = 'general';
@@ -651,3 +655,197 @@ export async function syncMiscCostsToFirestore(miscCosts: MiscellaneousCosts): P
     handleFirestoreError(err, OperationType.WRITE, `${MISC_COL}/${GENERAL_DOC}`);
   }
 }
+
+// ==========================================
+// REGISTERED MANAGERS MANAGEMENT (RBAC)
+// ==========================================
+
+/**
+ * Normalizes email address to lowercase and trimmed.
+ */
+export function normalizeEmail(email: string): string {
+  return (email || '').toLowerCase().trim();
+}
+
+/**
+ * Verifies if an email belongs to an authorized registered manager.
+ * huzaifaduet@gmail.com is unconditionally the primary authorized root manager.
+ */
+export async function verifyManagerEmail(email: string): Promise<{ isAllowed: boolean; manager?: RegisteredManager }> {
+  const cleanEmail = normalizeEmail(email);
+  if (!cleanEmail) {
+    return { isAllowed: false };
+  }
+
+  // 1. Primary root manager is always authorized
+  if (cleanEmail === PRIMARY_MANAGER_EMAIL) {
+    return {
+      isAllowed: true,
+      manager: {
+        email: PRIMARY_MANAGER_EMAIL,
+        name: 'Huzaifa (Primary Manager)',
+        role: 'primary',
+        addedAt: '2026-01-01T00:00:00.000Z'
+      }
+    };
+  }
+
+  // 2. Check Firestore managers collection
+  try {
+    const managerDocRef = doc(db, MANAGERS_COL, cleanEmail);
+    const snap = await getDocFromServer(managerDocRef);
+    if (snap.exists()) {
+      return {
+        isAllowed: true,
+        manager: snap.data() as RegisteredManager
+      };
+    }
+  } catch (err) {
+    console.warn(`Could not verify manager document for ${cleanEmail} directly:`, err);
+  }
+
+  // 3. Fallback: check settings registeredManagerEmails
+  try {
+    const settingsDocRef = doc(db, SETTINGS_COL, GENERAL_DOC);
+    const settingsSnap = await getDocFromServer(settingsDocRef);
+    if (settingsSnap.exists()) {
+      const data = settingsSnap.data() as MessSettings;
+      const list = (data.registeredManagerEmails || []).map(normalizeEmail);
+      if (list.includes(cleanEmail)) {
+        return {
+          isAllowed: true,
+          manager: {
+            email: cleanEmail,
+            role: 'manager',
+            addedAt: new Date().toISOString()
+          }
+        };
+      }
+    }
+  } catch (err) {
+    console.warn('Fallback settings check failed:', err);
+  }
+
+  return { isAllowed: false };
+}
+
+/**
+ * Fetches all registered managers from Firestore.
+ * Always ensures the primary manager is included.
+ */
+export async function fetchRegisteredManagers(): Promise<RegisteredManager[]> {
+  const managersMap = new Map<string, RegisteredManager>();
+
+  // Ensure primary manager is present
+  managersMap.set(PRIMARY_MANAGER_EMAIL, {
+    email: PRIMARY_MANAGER_EMAIL,
+    name: 'Primary Manager',
+    role: 'primary',
+    addedAt: '2026-01-01T00:00:00.000Z'
+  });
+
+  try {
+    const snap = await getDocsFromServer(collection(db, MANAGERS_COL));
+    snap.docs.forEach((docSnap) => {
+      const data = docSnap.data() as RegisteredManager;
+      if (data && data.email) {
+        managersMap.set(normalizeEmail(data.email), {
+          ...data,
+          email: normalizeEmail(data.email)
+        });
+      }
+    });
+  } catch (err) {
+    console.warn('Could not read managers collection from server:', err);
+  }
+
+  return Array.from(managersMap.values());
+}
+
+/**
+ * Registers a new manager email into Firestore.
+ */
+export async function registerNewManager(
+  email: string, 
+  name?: string, 
+  addedBy?: string
+): Promise<RegisteredManager> {
+  const cleanEmail = normalizeEmail(email);
+  if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
+    throw new Error('Please enter a valid email address.');
+  }
+
+  const newManager: RegisteredManager = {
+    email: cleanEmail,
+    name: name?.trim() || undefined,
+    role: cleanEmail === PRIMARY_MANAGER_EMAIL ? 'primary' : 'manager',
+    addedAt: new Date().toISOString(),
+    addedBy: addedBy || undefined
+  };
+
+  try {
+    const clean = sanitizeForFirestore(newManager);
+    await setDoc(doc(db, MANAGERS_COL, cleanEmail), clean);
+    return newManager;
+  } catch (err) {
+    console.error(`Failed to register manager ${cleanEmail}:`, err);
+    handleFirestoreError(err, OperationType.WRITE, `${MANAGERS_COL}/${cleanEmail}`);
+  }
+}
+
+/**
+ * Unregisters a manager by email.
+ * Primary manager cannot be removed.
+ */
+export async function unregisterManager(email: string): Promise<void> {
+  const cleanEmail = normalizeEmail(email);
+  if (cleanEmail === PRIMARY_MANAGER_EMAIL) {
+    throw new Error('The primary root manager (huzaifaduet@gmail.com) cannot be removed.');
+  }
+
+  try {
+    await deleteDoc(doc(db, MANAGERS_COL, cleanEmail));
+  } catch (err) {
+    console.error(`Failed to unregister manager ${cleanEmail}:`, err);
+    handleFirestoreError(err, OperationType.DELETE, `${MANAGERS_COL}/${cleanEmail}`);
+  }
+}
+
+/**
+ * Real-time listener for registered managers.
+ */
+export function subscribeToRegisteredManagers(
+  onUpdate: (managers: RegisteredManager[]) => void
+): () => void {
+  try {
+    return onSnapshot(collection(db, MANAGERS_COL), (snapshot) => {
+      const managersMap = new Map<string, RegisteredManager>();
+      
+      // Ensure primary manager is present
+      managersMap.set(PRIMARY_MANAGER_EMAIL, {
+        email: PRIMARY_MANAGER_EMAIL,
+        name: 'Primary Manager',
+        role: 'primary',
+        addedAt: '2026-01-01T00:00:00.000Z'
+      });
+
+      snapshot.docs.forEach((d) => {
+        const data = d.data() as RegisteredManager;
+        if (data && data.email) {
+          managersMap.set(normalizeEmail(data.email), {
+            ...data,
+            email: normalizeEmail(data.email)
+          });
+        }
+      });
+
+      onUpdate(Array.from(managersMap.values()));
+    }, (error) => {
+      console.warn('Realtime subscription to managers failed:', error);
+    });
+  } catch (err) {
+    console.warn('Could not establish manager listener:', err);
+    return () => {};
+  }
+}
+

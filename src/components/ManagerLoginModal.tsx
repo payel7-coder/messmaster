@@ -16,10 +16,12 @@ import {
   User,
   ArrowRight,
   Copy,
-  ExternalLink
+  ExternalLink,
+  ShieldAlert
 } from 'lucide-react';
-import { signInManagerWithGoogle } from '../firebase';
+import { signInManagerWithGoogle, signOutManager } from '../firebase';
 import { User as FirebaseUser } from 'firebase/auth';
+import { verifyManagerEmail, PRIMARY_MANAGER_EMAIL } from '../services/firestoreService';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 interface ManagerLoginModalProps {
@@ -44,6 +46,7 @@ export default function ManagerLoginModal({
   const [showPin, setShowPin] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [unauthorizedDomain, setUnauthorizedDomain] = useState<string | null>(null);
+  const [unregisteredEmail, setUnregisteredEmail] = useState<string | null>(null);
   const [copiedDomain, setCopiedDomain] = useState(false);
   const [isShaking, setIsShaking] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
@@ -81,8 +84,22 @@ export default function ManagerLoginModal({
   const handleGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     setErrorMsg('');
+    setUnregisteredEmail(null);
+    setUnauthorizedDomain(null);
     try {
       const user = await signInManagerWithGoogle();
+      const email = user.email || '';
+
+      // CRITICAL SECURITY GATE: Verify that the Google account is an authorized registered manager
+      const check = await verifyManagerEmail(email);
+      if (!check.isAllowed) {
+        // Immediately invalidate and sign out of Firebase session
+        await signOutManager();
+        setUnregisteredEmail(email);
+        setErrorMsg(`Access Denied: The Google account "${email}" is not registered as a manager.`);
+        return;
+      }
+
       if (rememberMe) {
         localStorage.setItem('mess_manager_auth', 'true');
       } else {
@@ -355,7 +372,70 @@ export default function ManagerLoginModal({
                 </span>
               </button>
 
-              {unauthorizedDomain ? (
+              {unregisteredEmail ? (
+                <div className="bg-rose-50 border border-rose-300 rounded-2xl p-4 text-xs text-rose-950 space-y-3 animate-fadeIn shadow-xs">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-rose-100 border border-rose-300 flex items-center justify-center text-rose-700 shrink-0">
+                      <ShieldAlert className="w-4 h-4 text-rose-700" />
+                    </div>
+                    <div>
+                      <h5 className="font-bold text-rose-950 text-sm">Access Denied: Unregistered Google Account</h5>
+                      <p className="text-rose-800 text-[11px] mt-0.5 leading-relaxed">
+                        Google authentication succeeded, but this account is not registered to manage this mess.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-rose-200 rounded-xl p-3 space-y-1">
+                    <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Attempted Account</div>
+                    <div className="font-mono text-xs font-bold text-rose-900 break-all">{unregisteredEmail}</div>
+                    <div className="text-[11px] text-rose-700 font-semibold flex items-center gap-1 pt-1">
+                      <X className="w-3.5 h-3.5 text-rose-600" />
+                      <span>Status: Not Registered as Manager</span>
+                    </div>
+                  </div>
+
+                  <div className="text-[11px] text-rose-900 bg-rose-100/60 p-3 rounded-xl border border-rose-200 space-y-1.5 leading-relaxed">
+                    <p className="font-bold text-rose-950">To access Manager Console:</p>
+                    <ul className="list-disc list-inside space-y-1 text-rose-800">
+                      <li>Sign in with the primary manager account: <code className="font-bold text-slate-900">{PRIMARY_MANAGER_EMAIL}</code></li>
+                      <li>Or ask the primary manager to register <code className="font-bold text-slate-900">{unregisteredEmail}</code> in <strong>Mess Settings → Registered Managers</strong></li>
+                      <li>Or unlock the console using the 4-digit Security PIN</li>
+                    </ul>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUnregisteredEmail(null);
+                        handleGoogleSignIn();
+                      }}
+                      className="w-full sm:flex-1 inline-flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 px-3 rounded-xl transition-all shadow-xs cursor-pointer text-xs"
+                    >
+                      <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                      </svg>
+                      <span>Switch Account</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('pin');
+                        setUnregisteredEmail(null);
+                      }}
+                      className="w-full sm:flex-1 inline-flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-3 rounded-xl transition-all shadow-xs cursor-pointer text-xs"
+                    >
+                      <KeyRound className="w-3.5 h-3.5" />
+                      <span>Unlock with PIN</span>
+                    </button>
+                  </div>
+                </div>
+              ) : unauthorizedDomain ? (
                 <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 text-xs text-amber-900 space-y-3 animate-fadeIn shadow-xs">
                   <div className="flex items-start gap-2.5">
                     <AlertCircle className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />

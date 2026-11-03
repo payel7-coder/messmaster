@@ -52,6 +52,15 @@ export interface MessSettings {
   currentMonth: string; // YYYY-MM (e.g., "2026-07")
   managerPin?: string; // Optional custom PIN for manager authentication (defaults to "1234")
   monthlyBudgetTarget?: number; // Target total monthly expenditure in Taka
+  registeredManagerEmails?: string[]; // Authorized manager emails eligible for Google SSO
+}
+
+export interface RegisteredManager {
+  email: string;
+  name?: string;
+  role: 'primary' | 'manager';
+  addedAt: string;
+  addedBy?: string;
 }
 
 export interface BoarderSummary {

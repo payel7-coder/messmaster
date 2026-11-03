@@ -26,10 +26,13 @@ import {
   AlertCircle,
   X,
   Database,
-  UploadCloud
+  UploadCloud,
+  UserCheck,
+  UserPlus,
+  Users
 } from 'lucide-react';
 
-import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings } from './types';
+import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, RegisteredManager } from './types';
 import { calculateReport } from './utils';
 import { INITIAL_SETTINGS, INITIAL_MISC_COSTS, generateSampleData } from './data';
 import { testFirestoreConnection, auth, signOutManager } from './firebase';
@@ -40,7 +43,13 @@ import {
   syncSettingsToFirestore,
   seedFirestore,
   clearBrowserLocalStorageCache,
-  forceFetchFromServer 
+  forceFetchFromServer,
+  PRIMARY_MANAGER_EMAIL,
+  verifyManagerEmail,
+  fetchRegisteredManagers,
+  registerNewManager,
+  unregisterManager,
+  subscribeToRegisteredManagers
 } from './services/firestoreService';
 import firebaseConfig from '../firebase-applet-config.json';
 
@@ -159,6 +168,13 @@ export default function App() {
   // Settings PIN management local state
   const [newPinInput, setNewPinInput] = useState<string>('');
   const [pinChangeSuccess, setPinChangeSuccess] = useState<boolean>(false);
+
+  // Registered Managers state (Google SSO RBAC)
+  const [registeredManagers, setRegisteredManagers] = useState<RegisteredManager[]>([]);
+  const [newManagerEmailInput, setNewManagerEmailInput] = useState<string>('');
+  const [newManagerNameInput, setNewManagerNameInput] = useState<string>('');
+  const [isRegisteringManager, setIsRegisteringManager] = useState<boolean>(false);
+  const [managerActionMsg, setManagerActionMsg] = useState<{ text: string; isError?: boolean } | null>(null);
 
   // --- Cloud Actions ---
   const handleForceRefresh = async () => {
@@ -332,17 +348,52 @@ export default function App() {
       },
     });
 
-    // Listen to Firebase Google Auth state across reloads/sessions
-    const authUnsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    // Fetch initial registered managers
+    fetchRegisteredManagers().then((mgrs) => {
+      setRegisteredManagers(mgrs);
+    }).catch(console.warn);
+
+    // Real-time subscription to registered managers collection
+    const managersUnsub = subscribeToRegisteredManagers((mgrs) => {
+      setRegisteredManagers(mgrs);
+    });
+
+    // Listen to Firebase Google Auth state across reloads/sessions with strict RBAC
+    const authUnsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        setGoogleUser({
-          displayName: firebaseUser.displayName,
-          email: firebaseUser.email,
-          photoURL: firebaseUser.photoURL,
-          uid: firebaseUser.uid,
-        });
-        setIsManagerAuthenticated(true);
-        localStorage.setItem('mess_manager_auth', 'true');
+        if (firebaseUser.email) {
+          try {
+            const check = await verifyManagerEmail(firebaseUser.email);
+            if (check.isAllowed) {
+              setGoogleUser({
+                displayName: firebaseUser.displayName,
+                email: firebaseUser.email,
+                photoURL: firebaseUser.photoURL,
+                uid: firebaseUser.uid,
+              });
+              setIsManagerAuthenticated(true);
+              localStorage.setItem('mess_manager_auth', 'true');
+            } else {
+              // Strictly reject unregistered Google accounts
+              await signOutManager();
+              setGoogleUser(null);
+              setIsManagerAuthenticated(false);
+              localStorage.removeItem('mess_manager_auth');
+              sessionStorage.removeItem('mess_manager_auth');
+              setRole('boarder');
+              setCloudToast({
+                message: `Access Denied: Google account (${firebaseUser.email}) is not an authorized manager.`,
+                type: 'error'
+              });
+              setTimeout(() => setCloudToast(null), 8000);
+            }
+          } catch (e) {
+            console.warn('Manager verification on auth state change encountered error:', e);
+          }
+        } else {
+          await signOutManager();
+          setGoogleUser(null);
+        }
       } else {
         setGoogleUser(null);
       }
@@ -351,6 +402,7 @@ export default function App() {
     return () => {
       unsubscribe();
       authUnsubscribe();
+      managersUnsub();
     };
   }, []);
 
@@ -481,6 +533,43 @@ export default function App() {
       syncSettingsToFirestore(updated);
       setPinChangeSuccess(true);
       setTimeout(() => setPinChangeSuccess(false), 3500);
+    }
+  };
+
+  const handleAddManager = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanEmail = newManagerEmailInput.trim().toLowerCase();
+    if (!cleanEmail) return;
+    setIsRegisteringManager(true);
+    setManagerActionMsg(null);
+    try {
+      await registerNewManager(
+        cleanEmail,
+        newManagerNameInput.trim() || undefined,
+        googleUser?.email || 'Manager'
+      );
+      setNewManagerEmailInput('');
+      setNewManagerNameInput('');
+      setManagerActionMsg({ text: `Authorized ${cleanEmail}! They can now sign in with Google SSO.` });
+      setTimeout(() => setManagerActionMsg(null), 5000);
+    } catch (err: any) {
+      setManagerActionMsg({ text: err?.message || 'Failed to register manager.', isError: true });
+    } finally {
+      setIsRegisteringManager(false);
+    }
+  };
+
+  const handleRemoveManager = async (emailToRemove: string) => {
+    if (emailToRemove === PRIMARY_MANAGER_EMAIL) return;
+    if (!window.confirm(`Revoke manager privileges for ${emailToRemove}? They will no longer be able to log in with Google.`)) {
+      return;
+    }
+    try {
+      await unregisterManager(emailToRemove);
+      setCloudToast({ message: `Revoked manager access for ${emailToRemove}`, type: 'info' });
+      setTimeout(() => setCloudToast(null), 4000);
+    } catch (err: any) {
+      setCloudToast({ message: `Error: ${err?.message || 'Could not remove manager'}`, type: 'error' });
     }
   };
 
@@ -915,15 +1004,17 @@ export default function App() {
                             {googleUser ? (googleUser.displayName || 'Google Manager') : 'Security PIN Manager'}
                           </span>
                           {googleUser ? (
-                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                              <svg className="w-2.5 h-2.5" viewBox="0 0 24 24">
-                                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-                              </svg>
-                              Google Verified
-                            </span>
+                            googleUser.email?.toLowerCase() === PRIMARY_MANAGER_EMAIL ? (
+                              <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <Lock className="w-2.5 h-2.5 text-emerald-700" />
+                                Root Primary Manager
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <ShieldCheck className="w-3 h-3 text-blue-600" />
+                                Authorized Manager
+                              </span>
+                            )
                           ) : (
                             <span className="text-[10px] font-semibold text-slate-600 bg-slate-200/80 px-1.5 py-0.5 rounded-full">
                               PIN Session
@@ -1074,6 +1165,156 @@ export default function App() {
                     <p className="text-[10px] text-gray-400 mt-1.5 leading-normal">
                       * This PIN locks access to the Manager Console. Boarders can continue viewing everything in public mode without a password.
                     </p>
+                  </div>
+
+                  {/* Registered Managers (Google SSO Authorized RBAC) */}
+                  <div className="pt-5 border-t border-slate-100">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                          <span>Registered Managers (Google SSO)</span>
+                          <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">
+                            {registeredManagers.length || 1} Authorized
+                          </span>
+                        </h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                          Only verified Google accounts listed here or the primary manager can sign in via Google SSO. Unregistered accounts are strictly blocked.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Authorized Managers list */}
+                    <div className="space-y-2 mb-4">
+                      {registeredManagers.length === 0 ? (
+                        <div className="flex items-center justify-between p-2.5 rounded-lg border text-xs bg-emerald-50/60 border-emerald-200/80 text-emerald-950">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                              H
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold truncate">Primary Root Manager</span>
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white flex items-center gap-1">
+                                  <Lock className="w-2.5 h-2.5" />
+                                  Root Primary
+                                </span>
+                              </div>
+                              <div className="text-[10px] text-slate-500 font-mono truncate">{PRIMARY_MANAGER_EMAIL}</div>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-medium text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded shrink-0">
+                            Immutable
+                          </span>
+                        </div>
+                      ) : (
+                        registeredManagers.map((mgr) => {
+                          const isPrimary = mgr.email === PRIMARY_MANAGER_EMAIL || mgr.role === 'primary';
+                          return (
+                            <div
+                              key={mgr.email}
+                              className={`flex items-center justify-between p-2.5 rounded-lg border text-xs ${
+                                isPrimary 
+                                  ? 'bg-emerald-50/60 border-emerald-200/80 text-emerald-950'
+                                  : 'bg-slate-50 border-slate-200 text-slate-800'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
+                                  isPrimary ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-700'
+                                }`}>
+                                  {mgr.name ? mgr.name.charAt(0).toUpperCase() : mgr.email.charAt(0).toUpperCase()}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-bold truncate">{mgr.name || mgr.email}</span>
+                                    {isPrimary ? (
+                                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white flex items-center gap-1">
+                                        <Lock className="w-2.5 h-2.5" />
+                                        Root Primary
+                                      </span>
+                                    ) : (
+                                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                                        Authorized Manager
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 font-mono truncate">{mgr.email}</div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 shrink-0 ml-2">
+                                {isPrimary ? (
+                                  <span className="text-[10px] font-medium text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded">
+                                    Immutable
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveManager(mgr.email)}
+                                    className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2 py-1 rounded border border-rose-200 cursor-pointer transition-colors flex items-center gap-1"
+                                    title={`Revoke manager privileges for ${mgr.email}`}
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                    Revoke
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    {/* Add new manager form */}
+                    <form onSubmit={handleAddManager} className="bg-slate-50/80 p-3 rounded-lg border border-slate-200 space-y-2.5">
+                      <div className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
+                        <UserPlus className="w-3.5 h-3.5 text-blue-600" />
+                        Authorize New Manager Google Account
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <input
+                          type="email"
+                          required
+                          placeholder="Google Account Email (e.g. name@gmail.com)"
+                          value={newManagerEmailInput}
+                          onChange={(e) => setNewManagerEmailInput(e.target.value)}
+                          className="bg-white border border-slate-200 rounded-md px-2.5 py-1.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Manager Name (optional)"
+                          value={newManagerNameInput}
+                          onChange={(e) => setNewManagerNameInput(e.target.value)}
+                          className="bg-white border border-slate-200 rounded-md px-2.5 py-1.5 text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
+                        <span className="text-[10px] text-slate-400">
+                          * Authorized email can sign in with Google Single Sign-On and manage this mess.
+                        </span>
+                        <button
+                          type="submit"
+                          disabled={isRegisteringManager || !newManagerEmailInput.trim()}
+                          className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold text-xs px-3 py-1.5 rounded-md cursor-pointer transition-colors flex items-center gap-1 self-end sm:self-auto shrink-0 shadow-2xs"
+                        >
+                          {isRegisteringManager ? (
+                            <RefreshCw className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <UserPlus className="w-3 h-3" />
+                          )}
+                          <span>Authorize Manager</span>
+                        </button>
+                      </div>
+                      {managerActionMsg && (
+                        <p className={`text-xs font-semibold mt-1 flex items-center gap-1 ${
+                          managerActionMsg.isError ? 'text-rose-600' : 'text-emerald-600'
+                        }`}>
+                          {managerActionMsg.isError ? <AlertCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                          {managerActionMsg.text}
+                        </p>
+                      )}
+                    </form>
                   </div>
 
                   {/* Danger Zone: Wipe Database */}
