@@ -20,6 +20,7 @@ import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSet
 import { formatReadableMonth } from '../utils';
 import PrintablePdfReportModal from './PrintablePdfReportModal';
 import BoarderMealSheetModal from './BoarderMealSheetModal';
+import { generateMonthlyReportPdf } from '../utils/pdfGenerator';
 
 interface MonthEndReportProps {
   report: MonthReport;
@@ -69,9 +70,34 @@ export default function MonthEndReport({
 
   const isAllExpanded = report.boardersReport.length > 0 && report.boardersReport.every(b => expandedBoarders[b.boarderId]);
 
-  // Print function
-  const handlePrint = () => {
-    window.print();
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+
+  // Direct download PDF function
+  const handleDownloadReportPdf = () => {
+    try {
+      setIsDownloadingPdf(true);
+      const doc = generateMonthlyReportPdf(
+        report,
+        boarders,
+        deposits,
+        mealLogs,
+        bazaarCosts,
+        miscCosts,
+        settings,
+        {
+          includeBazaarList: true,
+          includeFixedCostsBreakdown: true,
+          includeMemberSlips: true,
+        }
+      );
+      const cleanMessName = (settings.messName || 'Mess').replace(/[^a-zA-Z0-9]/g, '_');
+      doc.save(`${cleanMessName}_Monthly_Report_${report.month}.pdf`);
+    } catch (err) {
+      console.error('Error generating PDF report:', err);
+      setShowPdfModal(true);
+    } finally {
+      setIsDownloadingPdf(false);
+    }
   };
 
   // Export database state to JSON file
@@ -169,13 +195,14 @@ export default function MonthEndReport({
               </button>
 
               <button
-                onClick={handlePrint}
-                id="btn-print-report"
-                className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors shadow-2xs"
-                title="Direct print current page"
+                onClick={handleDownloadReportPdf}
+                disabled={isDownloadingPdf}
+                id="btn-download-pdf-direct"
+                className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors shadow-2xs disabled:opacity-50"
+                title="Directly download monthly audit PDF report with 4 vouchers per page"
               >
-                <Printer className="w-4 h-4 text-slate-300" />
-                Direct Print
+                <Download className="w-4 h-4 text-emerald-200" />
+                <span>{isDownloadingPdf ? 'Downloading...' : 'Download PDF'}</span>
               </button>
 
               <button

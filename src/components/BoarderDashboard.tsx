@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 import { 
   TrendingUp, 
   ArrowUpRight, 
@@ -13,6 +15,7 @@ import {
   Calculator,
   Receipt,
   Printer,
+  Download,
   X,
   CheckCircle2,
   Lock
@@ -38,10 +41,34 @@ export default function BoarderDashboard({
   mealLogs,
   allBoarders,
   bazaarCosts,
-  miscCosts,
   settings,
 }: BoarderDashboardProps) {
   const [showSlipModal, setShowSlipModal] = useState(false);
+  const [isDownloadingSlip, setIsDownloadingSlip] = useState(false);
+  const personalSlipRef = useRef<HTMLDivElement>(null);
+
+  const handleDownloadPersonalSlipPdf = async () => {
+    if (!personalSlipRef.current) return;
+    try {
+      setIsDownloadingSlip(true);
+      const canvas = await html2canvas(personalSlipRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+      });
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      const pdf = new jsPDF('p', 'mm', 'a5');
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
+      const cleanName = boarder.name.replace(/[^a-zA-Z0-9\u0980-\u09FF]/g, '_');
+      pdf.save(`Voucher_${cleanName}_${report.month}.pdf`);
+    } catch (err) {
+      console.error('Error generating personal voucher PDF:', err);
+    } finally {
+      setIsDownloadingSlip(false);
+    }
+  };
 
   // Find the summary of this specific boarder
   const summary = report.boardersReport.find(r => r.boarderId === boarder.id) || {
@@ -113,7 +140,7 @@ export default function BoarderDashboard({
             className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 py-3 rounded-xl cursor-pointer transition-all shadow-md shadow-blue-950/40 active:scale-98"
           >
             <Receipt className="w-4 h-4" />
-            <span>View & Print My Voucher Slip</span>
+            <span>View & Download My Voucher Slip</span>
           </button>
         </div>
       </div>
@@ -468,12 +495,14 @@ export default function BoarderDashboard({
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => window.print()}
-                  id="btn-print-personal-slip"
-                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg cursor-pointer transition-colors shadow-xs"
+                  onClick={handleDownloadPersonalSlipPdf}
+                  disabled={isDownloadingSlip}
+                  id="btn-download-personal-slip"
+                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-lg cursor-pointer transition-colors shadow-xs disabled:opacity-50"
+                  title="Download individual voucher slip as PDF"
                 >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Print Slip</span>
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isDownloadingSlip ? 'Downloading...' : 'Download PDF Slip'}</span>
                 </button>
                 <button
                   type="button"
@@ -488,7 +517,7 @@ export default function BoarderDashboard({
 
             {/* Official Voucher Slip Printable Card */}
             <div className="p-6 sm:p-8 bg-slate-50/50 print:bg-white print:p-0">
-              <div className="bg-white border-2 border-slate-900 rounded-xl p-6 shadow-sm print:shadow-none">
+              <div ref={personalSlipRef} className="bg-white border-2 border-slate-900 rounded-xl p-6 shadow-sm print:shadow-none">
                 {/* Slip Header */}
                 <div className="flex justify-between items-start border-b-2 border-slate-900 pb-3">
                   <div>

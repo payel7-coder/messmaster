@@ -408,34 +408,41 @@ export function generateMonthlyReportPdf(
     });
   }
 
-  // Individual printable financial vouchers / slips (Strictly 2 per page on A4)
+  // Individual printable financial vouchers / slips (Strictly 4 per page on A4: 2 columns x 2 rows)
   if (includeMemberSlips && report.boardersReport.length > 0) {
     doc.addPage();
-    let slipStartY = 16;
+    let slipStartY = 14;
 
-    doc.setFontSize(11);
+    doc.setFontSize(10.5);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(15, 23, 42);
-    doc.text(`5. INDIVIDUAL MEMBER FINANCIAL VOUCHER SLIPS - ${activeMonthStr.toUpperCase()}`, 14, slipStartY);
-    doc.setFontSize(7.5);
+    doc.text(`5. INDIVIDUAL MEMBER FINANCIAL VOUCHER SLIPS - ${activeMonthStr.toUpperCase()}`, 11, slipStartY);
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(100, 116, 139);
-    doc.text('Formatted 2 per page for crisp physical records and disbursement. Cut along the middle perforation line.', 14, slipStartY + 4);
-    slipStartY += 9;
+    doc.text('Arranged 4 vouchers per page (2x2 grid) for cost-effective physical records. Cut along vertical & horizontal perforation guidelines.', 11, slipStartY + 3.8);
+    slipStartY += 7;
 
-    const slipWidth = pageWidth - 28; // 182mm (full width across A4)
-    const slipHeight = 120; // 120mm height per slip
-    const slipsPerPage = 2;
+    const slipsPerPage = 4;
+    const colCount = 2;
+    const leftMargin = 11;
+    const topMargin = slipStartY;
+    const colGap = 6;
+    const rowGap = 7;
+    const slipWidth = (pageWidth - 2 * leftMargin - colGap) / colCount; // ~91mm
+    const slipHeight = 125; // 125mm height fits 2 rows easily on 297mm A4
 
     report.boardersReport.forEach((bSum, index) => {
       const pageIndex = index % slipsPerPage;
       if (index > 0 && pageIndex === 0) {
         doc.addPage();
-        slipStartY = 16;
       }
 
-      const x = 14;
-      const y = slipStartY + pageIndex * (slipHeight + 14);
+      const col = pageIndex % colCount;
+      const row = Math.floor(pageIndex / colCount);
+      const x = leftMargin + col * (slipWidth + colGap);
+      const y = topMargin + row * (slipHeight + rowGap);
+
       const bDetails = boarders.find(b => b.id === bSum.boarderId);
       const isSurplus = bSum.balance >= 0;
       const roomStr = bDetails?.roomNo || bSum.roomNo;
@@ -443,145 +450,151 @@ export function generateMonthlyReportPdf(
 
       // Voucher box outline
       doc.setDrawColor(203, 213, 225); // Slate 300
-      doc.setLineWidth(0.4);
+      doc.setLineWidth(0.35);
       doc.setFillColor(255, 255, 255);
-      doc.roundedRect(x, y, slipWidth, slipHeight, 2, 2, 'FD');
+      doc.roundedRect(x, y, slipWidth, slipHeight, 1.5, 1.5, 'FD');
 
-      // Top Banner Header
+      // Top Banner Header Band
       doc.setFillColor(248, 250, 252);
-      doc.roundedRect(x + 0.5, y + 0.5, slipWidth - 1, 16, 2, 2, 'F');
+      doc.roundedRect(x + 0.4, y + 0.4, slipWidth - 0.8, 14, 1.5, 1.5, 'F');
       doc.setDrawColor(226, 232, 240);
-      doc.line(x, y + 17, x + slipWidth, y + 17);
+      doc.line(x, y + 14.5, x + slipWidth, y + 14.5);
 
+      // Mess Title & Voucher #
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(12);
+      doc.setFontSize(8.5);
       doc.setTextColor(15, 23, 42);
-      doc.text((settings.messName || 'Mess').toUpperCase(), x + 5, y + 7);
+      doc.text((settings.messName || 'Mess').toUpperCase(), x + 3.5, y + 5);
 
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(71, 85, 105);
-      doc.text(`OFFICIAL FINANCIAL MEAL VOUCHER & STATEMENT • ${activeMonthStr.toUpperCase()}`, x + 5, y + 13);
-
-      // Voucher Serial & Room Tag on the right
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
+      doc.setFontSize(6.5);
       doc.setTextColor(30, 41, 59);
-      doc.text(`VOUCHER #${voucherNo}${roomStr ? ` | ROOM: ${roomStr}` : ''}`, x + slipWidth - 5, y + 7, { align: 'right' });
+      doc.text(`VOUCHER #${voucherNo}${roomStr ? ` | RM: ${roomStr}` : ''}`, x + slipWidth - 3.5, y + 5, { align: 'right' });
 
-      // Status Badge (REFUNDABLE vs DUE TO PAY)
+      // Subtitle
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(5.8);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`MEAL STATEMENT • ${activeMonthStr.toUpperCase()}`, x + 3.5, y + 9.5);
+
+      // Status Badge (REFUNDABLE vs OUTSTANDING DUE)
       doc.setFillColor(isSurplus ? 220 : 254, isSurplus ? 252 : 226, isSurplus ? 231 : 226);
-      doc.roundedRect(x + slipWidth - 46, y + 9.5, 41, 6, 1, 1, 'F');
+      doc.roundedRect(x + slipWidth - 31, y + 7.5, 27.5, 4.5, 0.8, 0.8, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7);
+      doc.setFontSize(5.5);
       doc.setTextColor(isSurplus ? 21 : 185, isSurplus ? 128 : 28, isSurplus ? 61 : 28);
-      doc.text(isSurplus ? 'REFUNDABLE / CREDIT' : 'OUTSTANDING DUE', x + slipWidth - 25.5, y + 13.8, { align: 'center' });
+      doc.text(isSurplus ? 'REFUNDABLE / CREDIT' : 'OUTSTANDING DUE', x + slipWidth - 17.25, y + 10.7, { align: 'center' });
 
       // Member Profile Info Strip
-      let curY = y + 23;
+      let curY = y + 19;
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9.5);
+      doc.setFontSize(8);
       doc.setTextColor(15, 23, 42);
-      doc.text(`Member: ${bSum.boarderName}${roomStr ? ` [${roomStr}]` : ''}`, x + 5, curY);
+      doc.text(`Member: ${bSum.boarderName}${roomStr ? ` [${roomStr}]` : ''}`, x + 3.5, curY);
 
       if (bDetails?.phone) {
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
+        doc.setFontSize(6.5);
         doc.setTextColor(100, 116, 139);
-        doc.text(`Contact: ${bDetails.phone}`, x + slipWidth - 5, curY, { align: 'right' });
+        doc.text(`Ph: ${bDetails.phone}`, x + slipWidth - 3.5, curY, { align: 'right' });
       }
 
       // Breakdown Box Table
-      curY += 4;
+      curY += 3;
       doc.setFillColor(248, 250, 252);
       doc.setDrawColor(226, 232, 240);
-      doc.rect(x + 4, curY, slipWidth - 8, 48, 'FD');
+      doc.rect(x + 3, curY, slipWidth - 6, 46, 'FD');
 
       // Row 1: Meals
-      let rowY = curY + 7;
+      let rowY = curY + 6;
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
+      doc.setFontSize(6.8);
       doc.setTextColor(51, 65, 85);
-      doc.text(`1. Total Meals Consumed (${bSum.totalMeals} meals @ Tk ${report.mealRate.toFixed(4)}/meal)`, x + 8, rowY);
+      doc.text(`1. Meals (${bSum.totalMeals} @ Tk ${report.mealRate.toFixed(2)})`, x + 5, rowY);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(15, 23, 42);
-      doc.text(`Tk ${bSum.mealCost.toFixed(2)}`, x + slipWidth - 8, rowY, { align: 'right' });
+      doc.text(`Tk ${bSum.mealCost.toFixed(2)}`, x + slipWidth - 5, rowY, { align: 'right' });
 
       // Row 2: Fixed Common Bills
-      rowY += 9;
+      rowY += 8.5;
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(51, 65, 85);
-      doc.text(`2. Shared Fixed Bills Share (House rent, cook, gas, electricity, wifi share)`, x + 8, rowY);
+      doc.text(`2. Shared Fixed Overhead Share`, x + 5, rowY);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(15, 23, 42);
-      doc.text(`Tk ${bSum.fixedCostShare.toFixed(2)}`, x + slipWidth - 8, rowY, { align: 'right' });
+      doc.text(`Tk ${bSum.fixedCostShare.toFixed(2)}`, x + slipWidth - 5, rowY, { align: 'right' });
 
       // Row 3: Total Charged (Divider line)
       rowY += 5;
       doc.setDrawColor(203, 213, 225);
-      doc.line(x + 7, rowY, x + slipWidth - 7, rowY);
+      doc.line(x + 5, rowY, x + slipWidth - 5, rowY);
       rowY += 6;
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9);
+      doc.setFontSize(7.2);
       doc.setTextColor(15, 23, 42);
-      doc.text('Total Month Cost Charged (1 + 2):', x + 8, rowY);
-      doc.text(`Tk ${bSum.totalCost.toFixed(2)}`, x + slipWidth - 8, rowY, { align: 'right' });
+      doc.text('Total Month Charged (1 + 2):', x + 5, rowY);
+      doc.text(`Tk ${bSum.totalCost.toFixed(2)}`, x + slipWidth - 5, rowY, { align: 'right' });
 
       // Row 4: Total Deposits
-      rowY += 9;
+      rowY += 8.5;
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(29, 78, 216); // Blue
-      doc.text('Total Cash / Bank Deposits Received:', x + 8, rowY);
+      doc.text('Total Deposits Received:', x + 5, rowY);
       doc.setFont('helvetica', 'bold');
-      doc.text(`Tk ${bSum.totalDeposit.toFixed(2)}`, x + slipWidth - 8, rowY, { align: 'right' });
+      doc.text(`Tk ${bSum.totalDeposit.toFixed(2)}`, x + slipWidth - 5, rowY, { align: 'right' });
 
       // Net Closing Balance Banner
-      curY += 53;
+      curY += 49;
       doc.setFillColor(isSurplus ? 240 : 254, isSurplus ? 253 : 242, isSurplus ? 244 : 242);
       doc.setDrawColor(isSurplus ? 187 : 254, isSurplus ? 247 : 202, isSurplus ? 208 : 202);
-      doc.rect(x + 4, curY, slipWidth - 8, 12, 'FD');
+      doc.rect(x + 3, curY, slipWidth - 6, 11, 'FD');
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9.5);
+      doc.setFontSize(7.2);
       doc.setTextColor(isSurplus ? 21 : 185, isSurplus ? 128 : 28, isSurplus ? 61 : 28);
-      doc.text(isSurplus ? 'Closing Refundable Balance (Credit):' : 'Net Outstanding Amount Payable (Due):', x + 8, curY + 8);
-      doc.setFontSize(11);
-      doc.text(`Tk ${Math.abs(bSum.balance).toFixed(2)}`, x + slipWidth - 8, curY + 8.5, { align: 'right' });
+      doc.text(isSurplus ? 'Closing Refundable (Credit):' : 'Net Amount Due (Payable):', x + 5, curY + 7);
+      doc.setFontSize(8.8);
+      doc.text(`Tk ${Math.abs(bSum.balance).toFixed(2)}`, x + slipWidth - 5, curY + 7.5, { align: 'right' });
 
       // Notes / Instructions line
-      curY += 16;
+      curY += 14;
       doc.setFont('helvetica', 'italic');
-      doc.setFontSize(6.8);
+      doc.setFontSize(5.2);
       doc.setTextColor(100, 116, 139);
-      doc.text('Please verify your meal count with the mess ledger. Clear dues promptly to support timely bazaar funding.', x + 5, curY);
+      doc.text('Please verify meals with ledger. Clear dues promptly.', x + 3.5, curY);
 
       // Dual Signatures
       curY += 9;
       doc.setDrawColor(148, 163, 184);
-      doc.setLineWidth(0.3);
-      doc.line(x + 8, curY, x + 58, curY);
-      doc.line(x + slipWidth - 58, curY, x + slipWidth - 8, curY);
+      doc.setLineWidth(0.25);
+      doc.line(x + 5, curY, x + 34, curY);
+      doc.line(x + slipWidth - 34, curY, x + slipWidth - 5, curY);
 
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
+      doc.setFontSize(5.6);
       doc.setTextColor(100, 116, 139);
-      doc.text('Boarder / Member Signature & Date', x + 33, curY + 4, { align: 'center' });
-      doc.text('Manager Verification & Seal', x + slipWidth - 33, curY + 4, { align: 'center' });
+      doc.text('Boarder Signature', x + 19.5, curY + 3.2, { align: 'center' });
+      doc.text('Manager Seal & Sig', x + slipWidth - 19.5, curY + 3.2, { align: 'center' });
 
-      // Perforation line between slip 1 and slip 2 on the same page
-      if (pageIndex === 0 && index < report.boardersReport.length - 1) {
-        const perfY = y + slipHeight + 7;
+      // Draw middle perforation guidelines on each page
+      const isLastOnPage = pageIndex === slipsPerPage - 1 || index === report.boardersReport.length - 1;
+      if (isLastOnPage) {
+        // Vertical perforation between column 0 and column 1
+        const midX = leftMargin + slipWidth + colGap / 2;
         doc.setDrawColor(180, 195, 210);
         doc.setLineWidth(0.2);
         doc.setLineDashPattern([2, 2], 0);
-        doc.line(8, perfY, pageWidth - 8, perfY);
-        doc.setLineDashPattern([], 0); // reset
+        doc.line(midX, topMargin - 2, midX, topMargin + 2 * slipHeight + rowGap + 2);
+
+        // Horizontal perforation between row 0 and row 1
+        const midY = topMargin + slipHeight + rowGap / 2;
+        doc.line(leftMargin - 2, midY, pageWidth - leftMargin + 2, midY);
+        doc.setLineDashPattern([], 0); // reset dash pattern
 
         doc.setFont('helvetica', 'normal');
-        doc.setFontSize(6);
+        doc.setFontSize(5.5);
         doc.setTextColor(148, 163, 184);
-        doc.text('- - - - - - - - - - - - - - - - - - - - - - - - ✂ Cut Along Perforation ✂ - - - - - - - - - - - - - - - - - - - - - - - -', pageWidth / 2, perfY - 0.8, { align: 'center' });
+        doc.text('✂ Cut Along Guidelines ✂', midX, midY - 0.6, { align: 'center' });
       }
     });
   }

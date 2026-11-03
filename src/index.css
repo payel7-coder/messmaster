@@ -31,6 +31,14 @@
       box-sizing: border-box !important;
     }
 
+    .voucher-four-per-page {
+      height: 126mm !important;
+      max-height: 126mm !important;
+      page-break-inside: avoid !important;
+      break-inside: avoid !important;
+      box-sizing: border-box !important;
+    }
+
     .voucher-page-break {
       page-break-after: always !important;
       break-after: page !important;
