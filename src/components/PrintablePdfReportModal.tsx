@@ -15,7 +15,7 @@ import {
   Sparkles,
   Languages
 } from 'lucide-react';
-import html2canvas from 'html2canvas';
+import { downloadElementAsPdf } from '../utils/pdfExportHelper';
 import jsPDF from 'jspdf';
 import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport } from '../types';
 import { formatReadableDate, formatReadableMonth } from '../utils';
@@ -68,44 +68,17 @@ export default function PrintablePdfReportModal({
   const netMessBalance = report.totalDeposits - (report.totalBazaarCost + report.totalFixedCost);
   const currentMonthBazaars = bazaarCosts.filter(b => b.date.startsWith(report.month));
 
-  // High-Fidelity Unicode & Bangla PDF Export via html2canvas (Direct Download)
+  // High-Fidelity Unicode & Bangla PDF Export (Direct Download)
   const handleDownloadUnicodePdf = async () => {
     if (!printableAreaRef.current) return;
     try {
       setIsGeneratingUnicodePdf(true);
-      const element = printableAreaRef.current;
-
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        windowWidth: 1200,
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      
-      const imgWidth = pdfWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pdfHeight;
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-        heightLeft -= pdfHeight;
-      }
-
       const cleanMessName = (settings.messName || 'Mess').replace(/[^a-zA-Z0-9\u0980-\u09FF]/g, '_');
-      pdf.save(`${cleanMessName}_Monthly_Report_${report.month}.pdf`);
+      await downloadElementAsPdf(
+        printableAreaRef.current,
+        `${cleanMessName}_Monthly_Report_${report.month}.pdf`,
+        { format: 'a4', orientation: 'portrait' }
+      );
     } catch (err) {
       console.error('Unicode PDF generation error:', err);
       // Fallback directly to vector PDF download instead of browser print
@@ -121,37 +94,12 @@ export default function PrintablePdfReportModal({
     if (!targetElement) return;
     try {
       setIsGeneratingSlipsPdf(true);
-      const canvas = await html2canvas(targetElement, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff',
-        windowWidth: 1200,
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      
-      const imgWidth = pdfWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      
-      let heightLeft = imgHeight;
-      let position = 0;
-
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= pdfHeight;
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
-        heightLeft -= pdfHeight;
-      }
-
       const cleanMessName = (settings.messName || 'Mess').replace(/[^a-zA-Z0-9\u0980-\u09FF]/g, '_');
-      pdf.save(`${cleanMessName}_4_Vouchers_Per_Page_${report.month}.pdf`);
+      await downloadElementAsPdf(
+        targetElement,
+        `${cleanMessName}_4_Vouchers_Per_Page_${report.month}.pdf`,
+        { format: 'a4', orientation: 'portrait' }
+      );
     } catch (err) {
       console.error('Slips PDF generation error:', err);
       alert('Could not download slips PDF. Please try again or download the full vector report.');

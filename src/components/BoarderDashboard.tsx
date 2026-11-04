@@ -1,6 +1,5 @@
 import React, { useState, useRef } from 'react';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+import { downloadElementAsPdf } from '../utils/pdfExportHelper';
 import { 
   TrendingUp, 
   ArrowUpRight, 
@@ -51,20 +50,15 @@ export default function BoarderDashboard({
     if (!personalSlipRef.current) return;
     try {
       setIsDownloadingSlip(true);
-      const canvas = await html2canvas(personalSlipRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#ffffff',
-      });
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      const pdf = new jsPDF('p', 'mm', 'a5');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'JPEG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
       const cleanName = boarder.name.replace(/[^a-zA-Z0-9\u0980-\u09FF]/g, '_');
-      pdf.save(`Voucher_${cleanName}_${report.month}.pdf`);
+      await downloadElementAsPdf(
+        personalSlipRef.current,
+        `Voucher_${cleanName}_${report.month}.pdf`,
+        { format: 'a5', orientation: 'portrait' }
+      );
     } catch (err) {
       console.error('Error generating personal voucher PDF:', err);
+      alert('Could not download voucher slip as PDF. Please try again.');
     } finally {
       setIsDownloadingSlip(false);
     }
