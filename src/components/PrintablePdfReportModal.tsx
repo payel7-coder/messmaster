@@ -688,7 +688,18 @@ export default function PrintablePdfReportModal({
                               <tr key={bazaar.id} className="hover:bg-slate-50/50">
                                 <td className="p-2 text-center text-slate-400 font-mono">{idx + 1}</td>
                                 <td className="p-2 font-mono text-slate-600">{formatReadableDate(bazaar.date)}</td>
-                                <td className="p-2 font-medium text-slate-800">{bazaar.description}</td>
+                                <td className="p-2 font-medium text-slate-800">
+                                  <span>{bazaar.description}</span>
+                                  {bazaar.dueAmount && !bazaar.isDueSettled ? (
+                                    <span className="ml-1.5 text-[9px] bg-amber-50 text-amber-800 border border-amber-300 px-1 py-0.2 rounded font-mono font-medium">
+                                      Shop Due: ৳{bazaar.dueAmount} {bazaar.dueShopName ? `(${bazaar.dueShopName})` : ''}
+                                    </span>
+                                  ) : bazaar.isDueSettled && bazaar.settledDate ? (
+                                    <span className="ml-1.5 text-[9px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-1 py-0.2 rounded font-mono font-medium">
+                                      Cash Settled
+                                    </span>
+                                  ) : null}
+                                </td>
                                 <td className="p-2 text-slate-600">{buyer}</td>
                                 <td className="p-2 text-right font-mono font-bold text-slate-900">
                                   ৳ {bazaar.amount.toLocaleString('en-IN')}

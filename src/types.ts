@@ -26,9 +26,15 @@ export interface DailyMealLog {
 export interface BazaarCost {
   id: string;
   date: string; // YYYY-MM-DD
-  amount: number; // in Taka
+  amount: number; // Total purchase cost in Taka
   description: string; // items bought
   spentById: string; // boarder ID who spent it (defaults to manager/general)
+  paidAmount?: number; // Cash actually paid at the time of shopping
+  dueAmount?: number; // Outstanding / credit purchase amount (baki)
+  dueShopName?: string; // Shop or vendor name (e.g. "Bhai Bhai Grocery", "Ratan Meat")
+  isDueSettled?: boolean; // Whether the due has been adjusted / cleared from cash
+  settledDate?: string; // Date when due was adjusted to cash (YYYY-MM-DD)
+  settledNote?: string; // Optional note regarding cash adjustment
 }
 
 export interface CustomFixedBill {

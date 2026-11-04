@@ -140,6 +140,19 @@ export default function ManagerDashboard({
   const [bazaarErrorMsg, setBazaarErrorMsg] = useState<string | null>(null);
   const [bazaarFilterScope, setBazaarFilterScope] = useState<'month' | 'all'>('month');
 
+  // Shop Due / Credit (দোকান বাকি) States
+  const [bazaarHasDue, setBazaarHasDue] = useState<boolean>(false);
+  const [bazaarPaidAmount, setBazaarPaidAmount] = useState<string>('');
+  const [bazaarDueAmount, setBazaarDueAmount] = useState<string>('');
+  const [bazaarDueShop, setBazaarDueShop] = useState<string>('');
+
+  // Settle / Adjust Due Modal State
+  const [adjustingBazaar, setAdjustingBazaar] = useState<BazaarCost | null>(null);
+  const [adjustCashAmount, setAdjustCashAmount] = useState<string>('');
+  const [adjustCashDate, setAdjustCashDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [adjustCashNote, setAdjustCashNote] = useState<string>('');
+  const [isAdjustingLoading, setIsAdjustingLoading] = useState<boolean>(false);
+
   // --- Deposit Add Form State ---
   const [depositAmount, setDepositAmount] = useState<string>('');
   const [depositDate, setDepositDate] = useState<string>(() => getInitialDateForMonth(settings.currentMonth));
@@ -381,6 +394,34 @@ export default function ManagerDashboard({
     });
   };
 
+  // Form helpers for due amount auto-calculation
+  const handleBazaarAmountChange = (val: string) => {
+    setBazaarAmount(val);
+    if (bazaarErrorMsg) setBazaarErrorMsg(null);
+    if (bazaarHasDue) {
+      const total = parseFloat(val) || 0;
+      const paid = parseFloat(bazaarPaidAmount) || 0;
+      const due = Math.max(0, total - paid);
+      setBazaarDueAmount(due > 0 ? String(due) : '0');
+    }
+  };
+
+  const handlePaidAmountChange = (val: string) => {
+    setBazaarPaidAmount(val);
+    const total = parseFloat(bazaarAmount) || 0;
+    const paid = parseFloat(val) || 0;
+    const due = Math.max(0, total - paid);
+    setBazaarDueAmount(due > 0 ? String(due) : '0');
+  };
+
+  const handleDueAmountChange = (val: string) => {
+    setBazaarDueAmount(val);
+    const total = parseFloat(bazaarAmount) || 0;
+    const due = parseFloat(val) || 0;
+    const paid = Math.max(0, total - due);
+    setBazaarPaidAmount(paid > 0 ? String(paid) : '0');
+  };
+
   // Add Bazaar Cost
   const handleAddBazaar = (e: React.FormEvent) => {
     e.preventDefault();
@@ -401,24 +442,133 @@ export default function ManagerDashboard({
       return;
     }
 
+    let paid = amt;
+    let due = 0;
+    let shopName = '';
+    let isSettled = true;
+
+    if (bazaarHasDue) {
+      const p = parseFloat(bazaarPaidAmount);
+      paid = !isNaN(p) && p >= 0 ? p : 0;
+      const d = parseFloat(bazaarDueAmount);
+      due = !isNaN(d) && d >= 0 ? d : Math.max(0, amt - paid);
+
+      if (Math.abs((paid + due) - amt) > 0.5) {
+        due = Math.max(0, amt - paid);
+      }
+
+      shopName = bazaarDueShop.trim() || 'Local Shop';
+      isSettled = due <= 0;
+    }
+
     const newBazaar: BazaarCost = {
       id: `c_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
       date: bazaarDate,
       amount: amt,
       description: bazaarDesc.trim(),
-      spentById: bazaarBuyer
+      spentById: bazaarBuyer,
+      paidAmount: paid,
+      dueAmount: due,
+      dueShopName: shopName || undefined,
+      isDueSettled: isSettled,
+      settledDate: isSettled && due > 0 ? bazaarDate : undefined
     };
 
     setBazaarCosts(prev => [newBazaar, ...prev]);
     syncBazaarToFirestore(newBazaar);
+    
+    // Reset form states
     setBazaarAmount('');
     setBazaarDesc('');
+    setBazaarHasDue(false);
+    setBazaarPaidAmount('');
+    setBazaarDueAmount('');
+    setBazaarDueShop('');
 
     const spenderName = boarders.find(b => b.id === bazaarBuyer)?.name || 'Manager / Mess Cash';
     const isCurrentMonth = bazaarDate.startsWith(settings.currentMonth);
+    const dueInfo = due > 0 ? ` [Shop Due: ৳${due.toLocaleString('en-IN')} at ${shopName}]` : '';
     setBazaarSuccessMsg(
-      `✓ Added ৳${amt.toLocaleString('en-IN')} for "${newBazaar.description}" (Buyer: ${spenderName}, Date: ${bazaarDate})${!isCurrentMonth ? ' (Note: Date belongs to another month. Use "All Months" to view)' : ''}`
+      `✓ Added ৳${amt.toLocaleString('en-IN')} for "${newBazaar.description}" (Buyer: ${spenderName}, Date: ${bazaarDate})${dueInfo}${!isCurrentMonth ? ' (Note: Date belongs to another month. Use "All Months" to view)' : ''}`
     );
+    setTimeout(() => setBazaarSuccessMsg(null), 5000);
+  };
+
+  const handleOpenAdjustModal = (cost: BazaarCost) => {
+    setAdjustingBazaar(cost);
+    const remainingDue = (cost.dueAmount !== undefined) ? cost.dueAmount : Math.max(0, cost.amount - (cost.paidAmount || 0));
+    setAdjustCashAmount(String(remainingDue > 0 ? remainingDue : cost.amount));
+    setAdjustCashDate(new Date().toISOString().split('T')[0]);
+    setAdjustCashNote(cost.dueShopName ? `Cleared due for ${cost.dueShopName}` : 'Paid from mess cash');
+  };
+
+  const handleConfirmAdjustToCash = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adjustingBazaar) return;
+
+    const amtToSettle = parseFloat(adjustCashAmount);
+    if (isNaN(amtToSettle) || amtToSettle <= 0) {
+      alert("Please enter a valid adjustment amount greater than 0.");
+      return;
+    }
+
+    setIsAdjustingLoading(true);
+    const currentPaid = adjustingBazaar.paidAmount !== undefined ? adjustingBazaar.paidAmount : (adjustingBazaar.amount - (adjustingBazaar.dueAmount || 0));
+    const currentDue = adjustingBazaar.dueAmount !== undefined ? adjustingBazaar.dueAmount : (adjustingBazaar.amount - currentPaid);
+
+    const newPaid = Math.min(adjustingBazaar.amount, currentPaid + amtToSettle);
+    const newDue = Math.max(0, currentDue - amtToSettle);
+    const isNowSettled = newDue <= 0;
+
+    const updatedCost: BazaarCost = {
+      ...adjustingBazaar,
+      paidAmount: newPaid,
+      dueAmount: newDue,
+      isDueSettled: isNowSettled,
+      settledDate: adjustCashDate || new Date().toISOString().split('T')[0],
+      settledNote: adjustCashNote.trim() || undefined
+    };
+
+    setBazaarCosts(prev => prev.map(c => c.id === updatedCost.id ? updatedCost : c));
+    syncBazaarToFirestore(updatedCost);
+    setIsAdjustingLoading(false);
+    setAdjustingBazaar(null);
+
+    setBazaarSuccessMsg(
+      `✓ Adjusted ৳${amtToSettle.toLocaleString('en-IN')} to cash for "${updatedCost.description}"! ${isNowSettled ? 'Shop due is now fully cleared.' : `Remaining due: ৳${newDue.toLocaleString('en-IN')}`}`
+    );
+    setTimeout(() => setBazaarSuccessMsg(null), 5000);
+  };
+
+  const handleAdjustAllDuesToCash = () => {
+    const unadjusted = bazaarCosts.filter(c => c.date.startsWith(settings.currentMonth) && (c.dueAmount || 0) > 0 && !c.isDueSettled);
+    if (unadjusted.length === 0) {
+      alert("No pending shop dues to adjust in this month.");
+      return;
+    }
+    const totalDue = unadjusted.reduce((sum, c) => sum + (c.dueAmount || 0), 0);
+    const confirmMsg = `Are you sure you want to adjust all ${unadjusted.length} shop dues (Total: ৳${totalDue.toLocaleString('en-IN')}) using mess cash in hand?`;
+    if (!confirm(confirmMsg)) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    const updatedCosts = bazaarCosts.map(c => {
+      if (c.date.startsWith(settings.currentMonth) && (c.dueAmount || 0) > 0 && !c.isDueSettled) {
+        const updatedItem: BazaarCost = {
+          ...c,
+          paidAmount: c.amount,
+          dueAmount: 0,
+          isDueSettled: true,
+          settledDate: today,
+          settledNote: c.settledNote || 'Adjusted in bulk to mess cash'
+        };
+        syncBazaarToFirestore(updatedItem);
+        return updatedItem;
+      }
+      return c;
+    });
+
+    setBazaarCosts(updatedCosts);
+    setBazaarSuccessMsg(`✓ Successfully adjusted all ${unadjusted.length} shop dues (৳${totalDue.toLocaleString('en-IN')}) to mess cash!`);
     setTimeout(() => setBazaarSuccessMsg(null), 5000);
   };
 
@@ -513,10 +663,23 @@ export default function ManagerDashboard({
     }
   };
 
-  // Manage Mess cash balance (Total Deposits - Total Bazaar - Total Fixed bills)
+  // Manage Mess cash balance with Shop Dues adjustment
+  const currentMonthBazaars = bazaarCosts.filter(c => c.date.startsWith(settings.currentMonth));
   const totalBazaarSpent = report.totalBazaarCost;
+  const totalBazaarCashPaid = currentMonthBazaars.reduce((sum, c) => {
+    if (c.paidAmount !== undefined) {
+      return sum + c.paidAmount;
+    }
+    return sum + c.amount;
+  }, 0);
+  const totalPendingBazaarDues = currentMonthBazaars.reduce((sum, c) => {
+    if (c.dueAmount && !c.isDueSettled) {
+      return sum + c.dueAmount;
+    }
+    return sum;
+  }, 0);
   const totalCashDeposited = report.totalDeposits;
-  const remainingCash = totalCashDeposited - totalBazaarSpent;
+  const remainingCash = totalCashDeposited - totalBazaarCashPaid;
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -595,16 +758,37 @@ export default function ManagerDashboard({
       </div>
 
       {/* Top Level Financial Summary Banner */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
         
         <div className="bg-blue-600 text-white p-4 rounded-xl shadow-xs">
-          <span className="text-[10px] text-blue-100 uppercase font-bold">Total Cash Deposits</span>
+          <span className="text-[10px] text-blue-100 uppercase font-bold">Cash Deposits</span>
           <p className="text-xl font-bold mt-1">৳ {totalCashDeposited.toLocaleString('en-IN')}</p>
+          <span className="text-[9.5px] text-blue-200">Total collected</span>
         </div>
 
         <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-xs">
-          <span className="text-[10px] text-slate-500 uppercase font-bold">Bazaar Expenses</span>
+          <span className="text-[10px] text-slate-500 uppercase font-bold">Bazaar Costs</span>
           <p className="text-xl font-bold text-slate-800 mt-1">৳ {totalBazaarSpent.toLocaleString('en-IN')}</p>
+          <span className="text-[9.5px] text-slate-400">Total consumption</span>
+        </div>
+
+        <div className={`p-4 rounded-xl shadow-xs border transition-colors ${
+          totalPendingBazaarDues > 0 ? 'bg-amber-50/70 border-amber-300' : 'bg-white border-slate-200'
+        }`}>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-slate-500 uppercase font-bold">Shop Dues (বাকি)</span>
+            {totalPendingBazaarDues > 0 && (
+              <span className="text-[8.5px] font-bold bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded-full">
+                Pending
+              </span>
+            )}
+          </div>
+          <p className={`text-xl font-bold mt-1 ${totalPendingBazaarDues > 0 ? 'text-amber-700' : 'text-slate-800'}`}>
+            ৳ {totalPendingBazaarDues.toLocaleString('en-IN')}
+          </p>
+          <span className="text-[9.5px] text-slate-400">
+            {totalPendingBazaarDues > 0 ? 'To adjust to cash' : 'Zero shop debt'}
+          </span>
         </div>
 
         <div className={`p-4 rounded-xl shadow-xs border ${
@@ -614,16 +798,19 @@ export default function ManagerDashboard({
           <p className={`text-xl font-bold mt-1 ${remainingCash >= 0 ? 'text-blue-700' : 'text-rose-700'}`}>
             ৳ {remainingCash.toLocaleString('en-IN')}
           </p>
+          <span className="text-[9.5px] text-slate-400">Cash in Hand (হাতে নগদ)</span>
         </div>
 
         <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-xs">
           <span className="text-[10px] text-slate-500 uppercase font-bold">Meal Rate</span>
           <p className="text-xl font-extrabold text-blue-600 mt-1">৳ {report.mealRate.toFixed(4)}</p>
+          <span className="text-[9.5px] text-slate-400">Per meal share</span>
         </div>
 
-        <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-xs col-span-2 lg:col-span-1">
-          <span className="text-[10px] text-slate-500 uppercase font-bold">Total Fixed Bills</span>
+        <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-xs">
+          <span className="text-[10px] text-slate-500 uppercase font-bold">Fixed Bills</span>
           <p className="text-xl font-bold text-slate-800 mt-1">৳ {report.totalFixedCost.toLocaleString('en-IN')}</p>
+          <span className="text-[9.5px] text-slate-400">Shared utilities</span>
         </div>
 
       </div>
@@ -1314,10 +1501,7 @@ export default function ManagerDashboard({
                     step="any"
                     placeholder="e.g. 850"
                     value={bazaarAmount}
-                    onChange={(e) => {
-                      setBazaarAmount(e.target.value);
-                      if (bazaarErrorMsg) setBazaarErrorMsg(null);
-                    }}
+                    onChange={(e) => handleBazaarAmountChange(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-2.5 text-xs font-bold text-slate-800 focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
                   />
                 </div>
@@ -1412,6 +1596,92 @@ export default function ManagerDashboard({
                 </p>
               </div>
 
+              {/* Option: Shop Due / Credit (দোকান বাকি) */}
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="chk-bazaar-has-due" className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-800">
+                    <input
+                      type="checkbox"
+                      id="chk-bazaar-has-due"
+                      checked={bazaarHasDue}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        setBazaarHasDue(checked);
+                        if (checked) {
+                          const total = parseFloat(bazaarAmount) || 0;
+                          setBazaarPaidAmount('0');
+                          setBazaarDueAmount(total > 0 ? String(total) : '0');
+                        } else {
+                          setBazaarPaidAmount('');
+                          setBazaarDueAmount('');
+                          setBazaarDueShop('');
+                        }
+                      }}
+                      className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <span>Has Shop Due / Credit (দোকান বাকি)?</span>
+                  </label>
+                  {bazaarHasDue && (
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-100/70 border border-amber-300/60 px-1.5 py-0.2 rounded font-mono">
+                      Credit Purchase
+                    </span>
+                  )}
+                </div>
+
+                {bazaarHasDue && (
+                  <div className="space-y-2.5 pt-2 border-t border-slate-200/80 animate-fadeIn">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                          Cash Paid Now (৳)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="0"
+                          value={bazaarPaidAmount}
+                          onChange={(e) => handlePaidAmountChange(e.target.value)}
+                          className="w-full bg-white border border-slate-200 rounded-md p-2 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-amber-800 mb-1">
+                          Shop Due / Baki (৳)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="Amount due"
+                          value={bazaarDueAmount}
+                          onChange={(e) => handleDueAmountChange(e.target.value)}
+                          className="w-full bg-white border border-amber-300 rounded-md p-2 text-xs font-bold text-amber-900 focus:ring-1 focus:ring-amber-500 focus:outline-hidden"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Shop / Vendor Name (দোকানের নাম)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Bhai Bhai Grocery, Alam Meat Store"
+                        value={bazaarDueShop}
+                        onChange={(e) => setBazaarDueShop(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-md p-2 text-xs font-medium text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                      />
+                    </div>
+
+                    <p className="text-[10.5px] text-slate-500 leading-tight">
+                      Meals will count the full ৳{bazaarAmount || 0} purchase. Only the cash paid (৳{bazaarPaidAmount || 0}) is deducted from mess cash today. Outstanding due (৳{bazaarDueAmount || 0}) can be adjusted to cash anytime.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <button
                 type="submit"
                 id="btn-submit-bazaar"
@@ -1473,6 +1743,39 @@ export default function ManagerDashboard({
               </div>
             </div>
             
+            {/* Outstanding Shop Dues Summary Banner */}
+            {totalPendingBazaarDues > 0 && (
+              <div className="mb-3 p-3.5 bg-amber-50/90 border border-amber-200/90 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn shrink-0">
+                <div className="flex items-start gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
+                    <Receipt className="w-4 h-4 text-amber-800" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-amber-950 uppercase tracking-wide">
+                        Outstanding Shop Dues (দোকান বকেয়া)
+                      </span>
+                      <span className="text-[10px] font-bold bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded-full font-mono">
+                        {currentMonthBazaars.filter(c => (c.dueAmount || 0) > 0 && !c.isDueSettled).length} Pending
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-amber-800 mt-0.5 leading-snug">
+                      Total <strong className="font-mono text-amber-950 font-bold">৳ {totalPendingBazaarDues.toLocaleString('en-IN')}</strong> in grocery/vendor credit. You can adjust items individually or settle all from cash in hand (৳{remainingCash.toLocaleString('en-IN')}).
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAdjustAllDuesToCash}
+                  className="self-start sm:self-auto flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg cursor-pointer transition-colors shadow-2xs shrink-0"
+                  title="Settle all pending shop dues using mess cash in hand"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>Adjust All to Cash</span>
+                </button>
+              </div>
+            )}
+
             <div className="overflow-y-auto flex-1 divide-y divide-slate-100 pr-1">
               {(() => {
                 const visibleCosts = bazaarCosts
@@ -1494,14 +1797,29 @@ export default function ManagerDashboard({
                 return visibleCosts.map((cost) => {
                   const spender = boarders.find(b => b.id === cost.spentById);
                   const isCurrentMonth = cost.date.startsWith(settings.currentMonth);
+                  const hasDue = (cost.dueAmount !== undefined && cost.dueAmount > 0) && !cost.isDueSettled;
+                  const isSettled = cost.isDueSettled && cost.settledDate;
+
                   return (
                     <div key={cost.id} className="py-3 flex items-start justify-between gap-4 hover:bg-slate-50/50 px-2 rounded-lg transition-colors">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
+                      <div className="space-y-1 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
                           <span className="text-sm font-bold text-slate-900 font-mono">৳ {cost.amount.toLocaleString('en-IN')}</span>
                           {!isCurrentMonth && (
                             <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.2 rounded font-medium">
                               Other Month
+                            </span>
+                          )}
+                          {hasDue && (
+                            <span className="text-[10px] bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md font-bold flex items-center gap-1 font-mono">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
+                              দোকান বাকি: ৳{cost.dueAmount?.toLocaleString('en-IN')} {cost.dueShopName ? `(${cost.dueShopName})` : ''}
+                            </span>
+                          )}
+                          {isSettled && (
+                            <span className="text-[10px] bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md font-medium flex items-center gap-1 font-mono" title={cost.settledNote || 'Adjusted to cash'}>
+                              <CheckCircle className="w-3 h-3 text-emerald-600" />
+                              ক্যাশ সমন্বিত ({formatReadableDate(cost.settledDate!)})
                             </span>
                           )}
                         </div>
@@ -1512,16 +1830,35 @@ export default function ManagerDashboard({
                           </span>
                           <span>•</span>
                           <span>Buyer: <strong className="text-slate-600">{spender ? spender.name : 'Mess Cash'}</strong></span>
+                          {cost.paidAmount !== undefined && cost.paidAmount < cost.amount && (
+                            <>
+                              <span>•</span>
+                              <span className="text-slate-600 font-mono">নগদ পরিশোধ: ৳{cost.paidAmount.toLocaleString('en-IN')}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                       
-                      <button
-                        onClick={() => handleDeleteBazaar(cost.id)}
-                        className="text-slate-300 hover:text-red-600 p-1.5 rounded-md transition-colors cursor-pointer shrink-0"
-                        title="Delete expense"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {hasDue && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenAdjustModal(cost)}
+                            className="flex items-center gap-1 bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer shadow-xs"
+                            title="Adjust this shop due to mess cash (ক্যাশ থেকে বকেয়া সমন্বয়)"
+                          >
+                            <Zap className="w-3 h-3" />
+                            <span>Adjust to Cash</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeleteBazaar(cost.id)}
+                          className="text-slate-300 hover:text-red-600 p-1.5 rounded-md transition-colors cursor-pointer shrink-0"
+                          title="Delete expense"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   );
                 });
@@ -2460,6 +2797,149 @@ export default function ManagerDashboard({
                   Save & Sync Cloud
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Adjust Shop Due to Cash */}
+      {adjustingBazaar && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-fadeIn">
+            <div className="p-4 bg-slate-900 text-white flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-amber-400" />
+                <h3 className="font-bold text-sm">Adjust Shop Due to Cash (ক্যাশ থেকে সমন্বয়)</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAdjustingBazaar(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleConfirmAdjustToCash} className="p-5 space-y-4 text-xs">
+              
+              {/* Purchase Overview Box */}
+              <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3.5 space-y-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-amber-800">Shopping Details</span>
+                    <h4 className="font-bold text-slate-900 text-xs mt-0.5">{adjustingBazaar.description}</h4>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      Date: {formatReadableDate(adjustingBazaar.date)} • Shop: <strong>{adjustingBazaar.dueShopName || 'Local Shop'}</strong>
+                    </span>
+                  </div>
+                  <span className="text-xs font-bold text-slate-800 font-mono">
+                    Total: ৳{adjustingBazaar.amount.toLocaleString('en-IN')}
+                  </span>
+                </div>
+
+                <div className="border-t border-amber-200/80 pt-2 grid grid-cols-2 gap-2 text-[11px]">
+                  <div>
+                    <span className="text-slate-500">Paid at Shopping:</span>
+                    <div className="font-bold text-slate-800 font-mono">
+                      ৳{(adjustingBazaar.paidAmount || 0).toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-amber-800 font-bold">Outstanding Due:</span>
+                    <div className="font-extrabold text-amber-700 font-mono text-sm">
+                      ৳{(adjustingBazaar.dueAmount !== undefined ? adjustingBazaar.dueAmount : (adjustingBazaar.amount - (adjustingBazaar.paidAmount || 0))).toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Cash in Hand Info */}
+              <div className="flex items-center justify-between p-2.5 bg-blue-50/60 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-1.5 text-blue-900 font-medium">
+                  <DollarSign className="w-4 h-4 text-blue-600" />
+                  <span>Available Mess Cash in Hand:</span>
+                </div>
+                <span className="font-mono font-bold text-blue-700 text-xs">
+                  ৳{remainingCash.toLocaleString('en-IN')}
+                </span>
+              </div>
+
+              {/* Input: Cash Amount to Deduct/Adjust */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Cash Amount to Disburse (৳ Taka) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">৳</span>
+                  <input
+                    type="number"
+                    required
+                    min="1"
+                    max={adjustingBazaar.dueAmount || adjustingBazaar.amount}
+                    step="any"
+                    value={adjustCashAmount}
+                    onChange={(e) => setAdjustCashAmount(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-2 text-xs font-bold text-slate-800 focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-500 mt-1">
+                  <span>Quick amount:</span>
+                  <button
+                    type="button"
+                    onClick={() => setAdjustCashAmount(String(adjustingBazaar.dueAmount || adjustingBazaar.amount))}
+                    className="text-blue-600 font-bold hover:underline cursor-pointer"
+                  >
+                    Full Due (৳{(adjustingBazaar.dueAmount || adjustingBazaar.amount).toLocaleString('en-IN')})
+                  </button>
+                </div>
+              </div>
+
+              {/* Input: Adjustment Date */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Settlement Date <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={adjustCashDate}
+                  onChange={(e) => setAdjustCashDate(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-medium focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                />
+              </div>
+
+              {/* Input: Settlement Note */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Settlement Note / Voucher (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Paid in cash to shopkeeper from mess balance"
+                  value={adjustCashNote}
+                  onChange={(e) => setAdjustCashNote(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-medium focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setAdjustingBazaar(null)}
+                  className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isAdjustingLoading}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2 rounded-lg cursor-pointer transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <Zap className="w-3.5 h-3.5" />
+                  <span>{isAdjustingLoading ? 'Adjusting...' : 'Confirm & Deduct Cash'}</span>
+                </button>
+              </div>
+
             </form>
           </div>
         </div>

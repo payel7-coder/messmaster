@@ -359,10 +359,16 @@ export function generateMonthlyReportPdf(
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((item, idx) => {
         const buyer = boarders.find(b => b.id === item.spentById)?.name || 'Manager';
+        let desc = item.description;
+        if (item.dueAmount && !item.isDueSettled) {
+          desc += ` [Shop Due: Tk ${item.dueAmount}${item.dueShopName ? ` at ${item.dueShopName}` : ''}]`;
+        } else if (item.isDueSettled && item.settledDate) {
+          desc += ` [Cash Adjusted: ${formatReadableDate(item.settledDate)}]`;
+        }
         return [
           (idx + 1).toString(),
           formatReadableDate(item.date),
-          item.description,
+          desc,
           buyer,
           `Tk ${item.amount.toLocaleString('en-IN')}`,
         ];
