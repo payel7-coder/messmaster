@@ -28,19 +28,24 @@ export async function downloadElementAsPdf(
   let canvas: HTMLCanvasElement;
 
   try {
-    canvas = await toCanvas(element, {
-      backgroundColor,
-      pixelRatio,
-      cacheBust: true,
-      skipFonts: false,
-    });
-  } catch (fontErr) {
-    console.warn('html-to-image font embedding encountered an issue, falling back to skipFonts: true', fontErr);
+    // skipFonts: true prevents html-to-image from accessing document.styleSheets.cssRules,
+    // which throws a SecurityError on cross-origin Google Fonts stylesheets.
+    // The browser still renders active web fonts directly onto the canvas.
     canvas = await toCanvas(element, {
       backgroundColor,
       pixelRatio,
       cacheBust: true,
       skipFonts: true,
+      fontEmbedCSS: '',
+    });
+  } catch (canvasErr) {
+    console.warn('html-to-image toCanvas encountered an issue, retrying with pixelRatio 1.5', canvasErr);
+    canvas = await toCanvas(element, {
+      backgroundColor,
+      pixelRatio: 1.5,
+      cacheBust: true,
+      skipFonts: true,
+      fontEmbedCSS: '',
     });
   }
 
