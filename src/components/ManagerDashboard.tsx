@@ -224,6 +224,163 @@ export default function ManagerDashboard({
     setEditingBoarder(null);
   };
 
+  // --- Bazaar Edit Form State ---
+  const [editingBazaar, setEditingBazaar] = useState<BazaarCost | null>(null);
+  const [editBazaarAmount, setEditBazaarAmount] = useState<string>('');
+  const [editBazaarDate, setEditBazaarDate] = useState<string>('');
+  const [editBazaarDesc, setEditBazaarDesc] = useState<string>('');
+  const [editBazaarBuyer, setEditBazaarBuyer] = useState<string>('');
+  const [editBazaarHasDue, setEditBazaarHasDue] = useState<boolean>(false);
+  const [editBazaarPaidAmount, setEditBazaarPaidAmount] = useState<string>('');
+  const [editBazaarDueAmount, setEditBazaarDueAmount] = useState<string>('');
+  const [editBazaarDueShop, setEditBazaarDueShop] = useState<string>('');
+
+  const handleOpenEditBazaar = (cost: BazaarCost) => {
+    setEditingBazaar(cost);
+    setEditBazaarAmount(String(cost.amount));
+    setEditBazaarDate(cost.date);
+    setEditBazaarDesc(cost.description);
+    setEditBazaarBuyer(cost.spentById || '');
+    const hasDue = (cost.dueAmount !== undefined && cost.dueAmount > 0) || (cost.paidAmount !== undefined && cost.paidAmount < cost.amount);
+    setEditBazaarHasDue(hasDue);
+    setEditBazaarPaidAmount(cost.paidAmount !== undefined ? String(cost.paidAmount) : String(cost.amount));
+    setEditBazaarDueAmount(cost.dueAmount !== undefined ? String(cost.dueAmount) : '0');
+    setEditBazaarDueShop(cost.dueShopName || '');
+  };
+
+  const handleEditBazaarAmountChange = (val: string) => {
+    setEditBazaarAmount(val);
+    if (editBazaarHasDue) {
+      const total = parseFloat(val) || 0;
+      const paid = parseFloat(editBazaarPaidAmount) || 0;
+      const due = Math.max(0, total - paid);
+      setEditBazaarDueAmount(due > 0 ? String(due) : '0');
+    }
+  };
+
+  const handleEditBazaarPaidChange = (val: string) => {
+    setEditBazaarPaidAmount(val);
+    const total = parseFloat(editBazaarAmount) || 0;
+    const paid = parseFloat(val) || 0;
+    const due = Math.max(0, total - paid);
+    setEditBazaarDueAmount(due > 0 ? String(due) : '0');
+  };
+
+  const handleEditBazaarDueChange = (val: string) => {
+    setEditBazaarDueAmount(val);
+    const total = parseFloat(editBazaarAmount) || 0;
+    const due = parseFloat(val) || 0;
+    const paid = Math.max(0, total - due);
+    setEditBazaarPaidAmount(paid > 0 ? String(paid) : '0');
+  };
+
+  const handleSaveEditedBazaar = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingBazaar) return;
+
+    const amt = parseFloat(editBazaarAmount);
+    if (isNaN(amt) || amt <= 0) {
+      alert("Please enter a valid expense amount greater than 0.");
+      return;
+    }
+    if (!editBazaarDesc.trim()) {
+      alert("Please enter items or description of the shopping.");
+      return;
+    }
+    if (!editBazaarDate) {
+      alert("Please select a valid shopping date.");
+      return;
+    }
+
+    let paid = amt;
+    let due = 0;
+    let shopName = '';
+    let isSettled = true;
+
+    if (editBazaarHasDue) {
+      const p = parseFloat(editBazaarPaidAmount);
+      paid = !isNaN(p) && p >= 0 ? p : 0;
+      const d = parseFloat(editBazaarDueAmount);
+      due = !isNaN(d) && d >= 0 ? d : Math.max(0, amt - paid);
+      if (Math.abs((paid + due) - amt) > 0.5) {
+        due = Math.max(0, amt - paid);
+      }
+      shopName = editBazaarDueShop.trim() || 'Local Shop';
+      isSettled = due <= 0;
+    }
+
+    const updated: BazaarCost = {
+      ...editingBazaar,
+      date: editBazaarDate,
+      amount: amt,
+      description: editBazaarDesc.trim(),
+      spentById: editBazaarBuyer,
+      paidAmount: paid,
+      dueAmount: due,
+      dueShopName: shopName || undefined,
+      isDueSettled: isSettled,
+      settledDate: isSettled && due > 0 ? (editingBazaar.settledDate || editBazaarDate) : (isSettled ? editingBazaar.settledDate : undefined),
+      settledNote: isSettled ? editingBazaar.settledNote : undefined
+    };
+
+    setBazaarCosts(prev => prev.map(c => c.id === updated.id ? updated : c));
+    syncBazaarToFirestore(updated);
+    setEditingBazaar(null);
+
+    setBazaarSuccessMsg(`✓ Updated bazaar purchase "${updated.description}" (৳${amt.toLocaleString('en-IN')})`);
+    setTimeout(() => setBazaarSuccessMsg(null), 5000);
+  };
+
+  // --- Deposit Edit Form State ---
+  const [editingDeposit, setEditingDeposit] = useState<Deposit | null>(null);
+  const [editDepositBoarderId, setEditDepositBoarderId] = useState<string>('');
+  const [editDepositAmount, setEditDepositAmount] = useState<string>('');
+  const [editDepositDate, setEditDepositDate] = useState<string>('');
+  const [editDepositNote, setEditDepositNote] = useState<string>('');
+
+  const handleOpenEditDeposit = (dep: Deposit) => {
+    setEditingDeposit(dep);
+    setEditDepositBoarderId(dep.boarderId);
+    setEditDepositAmount(String(dep.amount));
+    setEditDepositDate(dep.date);
+    setEditDepositNote(dep.note || '');
+  };
+
+  const handleSaveEditedDeposit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDeposit) return;
+
+    const amt = parseFloat(editDepositAmount);
+    if (isNaN(amt) || amt <= 0) {
+      alert("Please enter a valid deposit amount greater than 0.");
+      return;
+    }
+    if (!editDepositBoarderId) {
+      alert("Please select a boarder who made the deposit.");
+      return;
+    }
+    if (!editDepositDate) {
+      alert("Please select a valid deposit date.");
+      return;
+    }
+
+    const updated: Deposit = {
+      ...editingDeposit,
+      boarderId: editDepositBoarderId,
+      amount: amt,
+      date: editDepositDate,
+      note: editDepositNote.trim() || undefined
+    };
+
+    setDeposits(prev => prev.map(d => d.id === updated.id ? updated : d));
+    syncDepositToFirestore(updated);
+    setEditingDeposit(null);
+
+    const depositor = boarders.find(b => b.id === editDepositBoarderId);
+    setDepositSuccessMsg(`✓ Updated deposit for ${depositor?.name || 'Boarder'} (৳${amt.toLocaleString('en-IN')})`);
+    setTimeout(() => setDepositSuccessMsg(null), 5000);
+  };
+
   const handleUpdateStandardFixedCost = (field: keyof MiscellaneousCosts, val: number) => {
     const updated = {
       ...miscCosts,
@@ -1853,6 +2010,14 @@ export default function ManagerDashboard({
                           </button>
                         )}
                         <button
+                          type="button"
+                          onClick={() => handleOpenEditBazaar(cost)}
+                          className="text-slate-400 hover:text-blue-600 p-1.5 rounded-md transition-colors cursor-pointer shrink-0"
+                          title="Edit bazaar purchase"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => handleDeleteBazaar(cost.id)}
                           className="text-slate-300 hover:text-red-600 p-1.5 rounded-md transition-colors cursor-pointer shrink-0"
                           title="Delete expense"
@@ -2132,13 +2297,23 @@ export default function ManagerDashboard({
                         </div>
                       </div>
                       
-                      <button
-                        onClick={() => handleDeleteDeposit(dep.id)}
-                        className="text-slate-300 hover:text-red-600 p-1.5 rounded-md transition-colors cursor-pointer shrink-0"
-                        title="Delete deposit"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditDeposit(dep)}
+                          className="text-slate-400 hover:text-blue-600 p-1.5 rounded-md transition-colors cursor-pointer shrink-0"
+                          title="Edit deposit record"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteDeposit(dep.id)}
+                          className="text-slate-300 hover:text-red-600 p-1.5 rounded-md transition-colors cursor-pointer shrink-0"
+                          title="Delete deposit"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   );
                 });
@@ -2944,6 +3119,313 @@ export default function ManagerDashboard({
               </div>
 
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* --- EDIT BAZAAR PURCHASE MODAL (PORTALED TO BODY) --- */}
+      {editingBazaar && createPortal(
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 py-8 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200 animate-fadeIn my-auto">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 bg-slate-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                  <Edit3 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900">Edit Bazaar Purchase</h3>
+                  <p className="text-[11px] text-slate-500">Update cost, description, buyer, or shop dues</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingBazaar(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedBazaar} className="p-4 sm:p-5 space-y-4 text-xs">
+              {/* Amount & Date in 2 columns */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Total Amount (৳ Taka) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">৳</span>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      step="any"
+                      value={editBazaarAmount}
+                      onChange={(e) => handleEditBazaarAmountChange(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-2 text-xs font-bold text-slate-800 focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Shopping Date <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editBazaarDate}
+                    onChange={(e) => setEditBazaarDate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-medium text-slate-800 focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              {/* Items / Description */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Items Purchased / Description <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editBazaarDesc}
+                  onChange={(e) => setEditBazaarDesc(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-medium text-slate-800 focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                />
+              </div>
+
+              {/* Paid / Spent By */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Spent By (Shopper / Disburser)
+                </label>
+                <select
+                  value={editBazaarBuyer}
+                  onChange={(e) => setEditBazaarBuyer(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-medium text-slate-800 focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                >
+                  <option value="">Mess Cash in Hand (মেস ক্যাশ তহবিল)</option>
+                  {boarders.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}{b.roomNo ? ` (${b.roomNo})` : ''}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Has Due / Credit Section */}
+              <div className="border border-slate-200 rounded-xl p-3.5 bg-slate-50/60 space-y-3">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={editBazaarHasDue}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setEditBazaarHasDue(checked);
+                      if (checked) {
+                        const total = parseFloat(editBazaarAmount) || 0;
+                        setEditBazaarPaidAmount(String(total));
+                        setEditBazaarDueAmount('0');
+                      }
+                    }}
+                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                  />
+                  <span className="text-xs font-semibold text-slate-800">
+                    দোকান বাকি / বকেয়া ছিল? (Has Shop Due / Credit)
+                  </span>
+                </label>
+
+                {editBazaarHasDue && (
+                  <div className="pt-2 border-t border-slate-200 space-y-3 animate-fadeIn">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        দোকানের নাম (Shop Name)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. ভাই ভাই স্টোর, কাঁচা বাজার"
+                        value={editBazaarDueShop}
+                        onChange={(e) => setEditBazaarDueShop(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-medium text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                          নগদ পরিশোধ (Paid)
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">৳</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={editBazaarPaidAmount}
+                            onChange={(e) => handleEditBazaarPaidChange(e.target.value)}
+                            className="w-full bg-white border border-slate-200 rounded-lg pl-6 pr-2 py-1.5 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-semibold text-amber-800 mb-1">
+                          বাকি পরিমাণ (Due)
+                        </label>
+                        <div className="relative">
+                          <span className="absolute left-2.5 top-2 text-xs font-bold text-amber-500">৳</span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="any"
+                            value={editBazaarDueAmount}
+                            onChange={(e) => handleEditBazaarDueChange(e.target.value)}
+                            className="w-full bg-amber-50/70 border border-amber-300 rounded-lg pl-6 pr-2 py-1.5 text-xs font-bold text-amber-900 focus:ring-1 focus:ring-amber-500 focus:outline-hidden"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingBazaar(null)}
+                  className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-lg cursor-pointer transition-colors shadow-xs flex items-center gap-1.5"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Save Changes</span>
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* --- EDIT DEPOSIT MODAL (PORTALED TO BODY) --- */}
+      {editingDeposit && createPortal(
+        <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 py-8 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200 animate-fadeIn my-auto">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-slate-100 bg-slate-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm sm:text-base font-bold text-slate-900">Edit Member Deposit</h3>
+                  <p className="text-[11px] text-slate-500">Update deposit amount, boarder, or date</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingDeposit(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedDeposit} className="p-4 sm:p-5 space-y-4 text-xs">
+              {/* Boarder selector */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Deposited By (Boarder) <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  required
+                  value={editDepositBoarderId}
+                  onChange={(e) => setEditDepositBoarderId(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-medium text-slate-800 focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                >
+                  <option value="">Select Boarder</option>
+                  {boarders.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}{b.roomNo ? ` (${b.roomNo})` : ''}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Amount & Date */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Deposit Amount (৳ Taka) <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-xs font-bold text-slate-400">৳</span>
+                    <input
+                      type="number"
+                      required
+                      min="1"
+                      step="any"
+                      value={editDepositAmount}
+                      onChange={(e) => setEditDepositAmount(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-lg pl-7 pr-3 py-2 text-xs font-bold text-slate-800 focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Deposit Date <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={editDepositDate}
+                    onChange={(e) => setEditDepositDate(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-medium text-slate-800 focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              {/* Note / Memo */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Payment Note / Memo (Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. bKash payment, Cash advance, 1st installment"
+                  value={editDepositNote}
+                  onChange={(e) => setEditDepositNote(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-medium text-slate-800 focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setEditingDeposit(null)}
+                  className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-lg cursor-pointer transition-colors shadow-xs flex items-center gap-1.5"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Save Deposit</span>
+                </button>
+              </div>
+            </form>
+
           </div>
         </div>,
         document.body
