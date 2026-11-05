@@ -16,11 +16,9 @@ import {
   Sparkles,
   Languages
 } from 'lucide-react';
-import { downloadElementAsPdf } from '../utils/pdfExportHelper';
-import jsPDF from 'jspdf';
 import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport } from '../types';
 import { formatReadableDate, formatReadableMonth } from '../utils';
-import { generateMonthlyReportPdf } from '../utils/pdfGenerator';
+import { generateMonthlyReportPdf, generateSlipsOnlyPdf } from '../utils/pdfGenerator';
 
 interface PrintablePdfReportModalProps {
   isOpen: boolean;
@@ -59,7 +57,6 @@ export default function PrintablePdfReportModal({
   const [activePreviewTab, setActivePreviewTab] = useState<'all' | 'master' | 'slips' | 'bazaar'>('all');
   const [copiedWhatsApp, setCopiedWhatsApp] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [isGeneratingUnicodePdf, setIsGeneratingUnicodePdf] = useState(false);
   const [isGeneratingSlipsPdf, setIsGeneratingSlipsPdf] = useState(false);
 
   if (!isOpen) return null;
@@ -69,48 +66,8 @@ export default function PrintablePdfReportModal({
   const netMessBalance = report.totalDeposits - (report.totalBazaarCost + report.totalFixedCost);
   const currentMonthBazaars = bazaarCosts.filter(b => b.date.startsWith(report.month));
 
-  // High-Fidelity Unicode & Bangla PDF Export (Direct Download)
-  const handleDownloadUnicodePdf = async () => {
-    if (!printableAreaRef.current) return;
-    try {
-      setIsGeneratingUnicodePdf(true);
-      const cleanMessName = (settings.messName || 'Mess').replace(/[^a-zA-Z0-9\u0980-\u09FF]/g, '_');
-      await downloadElementAsPdf(
-        printableAreaRef.current,
-        `${cleanMessName}_Monthly_Report_${report.month}.pdf`,
-        { format: 'a4', orientation: 'portrait' }
-      );
-    } catch (err) {
-      console.error('Unicode PDF generation error:', err);
-      // Fallback directly to vector PDF download instead of browser print
-      handleDownloadPdf();
-    } finally {
-      setIsGeneratingUnicodePdf(false);
-    }
-  };
-
-  // Direct Download for 4-Vouchers-Per-Page Slips Only
-  const handleDownloadSlipsOnlyPdf = async () => {
-    const targetElement = printableSlipsAreaRef.current || printableAreaRef.current;
-    if (!targetElement) return;
-    try {
-      setIsGeneratingSlipsPdf(true);
-      const cleanMessName = (settings.messName || 'Mess').replace(/[^a-zA-Z0-9\u0980-\u09FF]/g, '_');
-      await downloadElementAsPdf(
-        targetElement,
-        `${cleanMessName}_4_Vouchers_Per_Page_${report.month}.pdf`,
-        { format: 'a4', orientation: 'portrait' }
-      );
-    } catch (err) {
-      console.error('Slips PDF generation error:', err);
-      alert('Could not download slips PDF. Please try again or download the full vector report.');
-    } finally {
-      setIsGeneratingSlipsPdf(false);
-    }
-  };
-
-  // Trigger vector PDF download using jsPDF
-  const handleDownloadPdf = () => {
+  // High-Fidelity Pure Vector Full PDF Export (Direct Download)
+  const handleDownloadFullPdf = () => {
     try {
       setIsGeneratingPdf(true);
       const doc = generateMonthlyReportPdf(
@@ -135,10 +92,36 @@ export default function PrintablePdfReportModal({
       const filename = `${cleanMessName}_Monthly_Report_${report.month}.pdf`;
       doc.save(filename);
     } catch (err) {
-      console.error('Error generating PDF:', err);
-      alert('Could not generate PDF directly. You can use the Print / Save to PDF button as an alternative.');
+      console.error('Error generating vector PDF report:', err);
+      alert('Could not generate PDF report. You can use the Print / Save to PDF preview as an alternative.');
     } finally {
       setIsGeneratingPdf(false);
+    }
+  };
+
+  // Direct Vector Download for 4-Vouchers-Per-Page Slips Only
+  const handleDownloadSlipsOnlyPdf = () => {
+    try {
+      setIsGeneratingSlipsPdf(true);
+      const doc = generateSlipsOnlyPdf(
+        report,
+        boarders,
+        settings,
+        {
+          managerName,
+          managerPhone,
+          customNotes,
+        }
+      );
+
+      const cleanMessName = (settings.messName || 'Mess').replace(/[^a-zA-Z0-9]/g, '_');
+      const filename = `${cleanMessName}_4_Vouchers_Per_Page_${report.month}.pdf`;
+      doc.save(filename);
+    } catch (err) {
+      console.error('Slips PDF generation error:', err);
+      alert('Could not download slips PDF. Please try again.');
+    } finally {
+      setIsGeneratingSlipsPdf(false);
     }
   };
 
@@ -207,14 +190,14 @@ export default function PrintablePdfReportModal({
           <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
-              onClick={handleDownloadUnicodePdf}
-              disabled={isGeneratingUnicodePdf}
-              id="btn-modal-download-unicode-pdf"
+              onClick={handleDownloadFullPdf}
+              disabled={isGeneratingPdf}
+              id="btn-modal-download-pdf"
               className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-colors cursor-pointer shadow-xs disabled:opacity-50"
-              title="Directly download full PDF report file with complete Bangla and English font support"
+              title="Directly download full official PDF audit statement with executive summary, tables, and member slips"
             >
               <Download className="w-4 h-4 text-emerald-200" />
-              <span>{isGeneratingUnicodePdf ? 'Rendering PDF...' : 'Download PDF Report'}</span>
+              <span>{isGeneratingPdf ? 'Generating PDF...' : 'Download Full PDF Report'}</span>
             </button>
 
             <button
@@ -227,18 +210,6 @@ export default function PrintablePdfReportModal({
             >
               <Receipt className="w-4 h-4 text-blue-200" />
               <span>{isGeneratingSlipsPdf ? 'Generating Slips...' : 'Download 4-Voucher Slips (PDF)'}</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={handleDownloadPdf}
-              disabled={isGeneratingPdf}
-              id="btn-modal-download-pdf"
-              className="hidden sm:flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs px-3 py-2 rounded-xl transition-colors cursor-pointer border border-slate-700 disabled:opacity-50"
-              title="Download compact vector PDF file"
-            >
-              <Download className="w-4 h-4 text-slate-400" />
-              <span>{isGeneratingPdf ? 'Generating...' : 'Vector PDF'}</span>
             </button>
 
             <button

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { downloadElementAsPdf } from '../utils/pdfExportHelper';
+import { generatePersonalVoucherPdf } from '../utils/pdfGenerator';
 import { 
   TrendingUp, 
   ArrowUpRight, 
@@ -47,16 +47,17 @@ export default function BoarderDashboard({
   const [isDownloadingSlip, setIsDownloadingSlip] = useState(false);
   const personalSlipRef = useRef<HTMLDivElement>(null);
 
-  const handleDownloadPersonalSlipPdf = async () => {
-    if (!personalSlipRef.current) return;
+  const handleDownloadPersonalSlipPdf = () => {
     try {
       setIsDownloadingSlip(true);
-      const cleanName = boarder.name.replace(/[^a-zA-Z0-9\u0980-\u09FF]/g, '_');
-      await downloadElementAsPdf(
-        personalSlipRef.current,
-        `Voucher_${cleanName}_${report.month}.pdf`,
-        { format: 'a5', orientation: 'portrait' }
+      const cleanName = boarder.name.replace(/[^a-zA-Z0-9]/g, '_');
+      const doc = generatePersonalVoucherPdf(
+        boarder,
+        report,
+        deposits,
+        settings || { messName: 'Mess', currentMonth: report.month }
       );
+      doc.save(`Voucher_${cleanName}_${report.month}.pdf`);
     } catch (err) {
       console.error('Error generating personal voucher PDF:', err);
       alert('Could not download voucher slip as PDF. Please try again.');

@@ -982,3 +982,469 @@ export function generateBoardersMealSheetPdf(
   return doc;
 }
 
+export interface SlipsOnlyPdfOptions {
+  managerName?: string;
+  managerPhone?: string;
+  customNotes?: string;
+}
+
+/**
+ * Generates an official, pure vector PDF containing strictly 4-per-page member financial vouchers.
+ * Renders directly via jsPDF vector primitives (lines, text, boxes, badges, cut guides) - no raster screenshots.
+ */
+export function generateSlipsOnlyPdf(
+  report: MonthReport,
+  boarders: Boarder[],
+  settings: MessSettings,
+  options: SlipsOnlyPdfOptions = {}
+): jsPDF {
+  const {
+    managerName = 'Mess Manager',
+    managerPhone = '',
+    customNotes = 'Please verify meal counts and clear remaining dues before the 5th of next month.',
+  } = options;
+
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const activeMonthStr = formatReadableMonth(report.month);
+
+  const slipsPerPage = 4;
+  const colCount = 2;
+  const leftMargin = 10;
+  const topMargin = 10;
+  const colGap = 6;
+  const rowGap = 7;
+  const slipWidth = (pageWidth - 2 * leftMargin - colGap) / colCount; // ~92mm
+  const slipHeight = 130; // 130mm * 2 + 7mm + 20mm = 287mm < 297mm A4
+
+  report.boardersReport.forEach((bSum, index) => {
+    const pageIndex = index % slipsPerPage;
+    if (index > 0 && pageIndex === 0) {
+      doc.addPage();
+    }
+
+    const col = pageIndex % colCount;
+    const row = Math.floor(pageIndex / colCount);
+    const x = leftMargin + col * (slipWidth + colGap);
+    const y = topMargin + row * (slipHeight + rowGap);
+
+    const bDetails = boarders.find(b => b.id === bSum.boarderId);
+    const isSurplus = bSum.balance >= 0;
+    const roomStr = bDetails?.roomNo || bSum.roomNo;
+    const voucherNo = (index + 1).toString().padStart(2, '0');
+
+    // Voucher box outline
+    doc.setDrawColor(203, 213, 225); // Slate 300
+    doc.setLineWidth(0.35);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(x, y, slipWidth, slipHeight, 1.5, 1.5, 'FD');
+
+    // Top Banner Header Band
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(x + 0.4, y + 0.4, slipWidth - 0.8, 14, 1.5, 1.5, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.line(x, y + 14.5, x + slipWidth, y + 14.5);
+
+    // Mess Title & Voucher #
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text((settings.messName || 'Mess').toUpperCase(), x + 3.5, y + 5);
+
+    doc.setFontSize(6.5);
+    doc.setTextColor(30, 41, 59);
+    doc.text(`VOUCHER #${voucherNo}${roomStr ? ` | RM: ${roomStr}` : ''}`, x + slipWidth - 3.5, y + 5, { align: 'right' });
+
+    // Subtitle
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(5.8);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`MEAL STATEMENT • ${activeMonthStr.toUpperCase()}`, x + 3.5, y + 9.5);
+
+    // Status Badge (REFUNDABLE vs OUTSTANDING DUE)
+    doc.setFillColor(isSurplus ? 220 : 254, isSurplus ? 252 : 226, isSurplus ? 231 : 226);
+    doc.roundedRect(x + slipWidth - 31, y + 7.5, 27.5, 4.5, 0.8, 0.8, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(5.5);
+    doc.setTextColor(isSurplus ? 21 : 185, isSurplus ? 128 : 28, isSurplus ? 61 : 28);
+    doc.text(isSurplus ? 'REFUNDABLE / CREDIT' : 'OUTSTANDING DUE', x + slipWidth - 17.25, y + 10.7, { align: 'center' });
+
+    // Member Profile Info Strip
+    let curY = y + 19;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Member: ${bSum.boarderName}${roomStr ? ` [${roomStr}]` : ''}`, x + 3.5, curY);
+
+    if (bDetails?.phone) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Ph: ${bDetails.phone}`, x + slipWidth - 3.5, curY, { align: 'right' });
+    }
+
+    // Breakdown Box Table
+    curY += 3;
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(x + 3, curY, slipWidth - 6, 48, 'FD');
+
+    // Row 1: Meals
+    let rowY = curY + 6;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.8);
+    doc.setTextColor(51, 65, 85);
+    doc.text(`1. Meals (${bSum.totalMeals} @ Tk ${report.mealRate.toFixed(2)})`, x + 5, rowY);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Tk ${bSum.mealCost.toFixed(2)}`, x + slipWidth - 5, rowY, { align: 'right' });
+
+    // Row 2: Fixed Common Bills
+    rowY += 9;
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(51, 65, 85);
+    doc.text(`2. Shared Fixed Overhead Share`, x + 5, rowY);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Tk ${bSum.fixedCostShare.toFixed(2)}`, x + slipWidth - 5, rowY, { align: 'right' });
+
+    // Row 3: Total Charged (Divider line)
+    rowY += 5.5;
+    doc.setDrawColor(203, 213, 225);
+    doc.line(x + 5, rowY, x + slipWidth - 5, rowY);
+    rowY += 6.5;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.2);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Total Month Charged (1 + 2):', x + 5, rowY);
+    doc.text(`Tk ${bSum.totalCost.toFixed(2)}`, x + slipWidth - 5, rowY, { align: 'right' });
+
+    // Row 4: Total Deposits
+    rowY += 9;
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(29, 78, 216); // Blue
+    doc.text('Total Deposits Received:', x + 5, rowY);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Tk ${bSum.totalDeposit.toFixed(2)}`, x + slipWidth - 5, rowY, { align: 'right' });
+
+    // Net Closing Balance Banner
+    curY += 51;
+    doc.setFillColor(isSurplus ? 240 : 254, isSurplus ? 253 : 242, isSurplus ? 244 : 242);
+    doc.setDrawColor(isSurplus ? 187 : 254, isSurplus ? 247 : 202, isSurplus ? 208 : 202);
+    doc.rect(x + 3, curY, slipWidth - 6, 12, 'FD');
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.2);
+    doc.setTextColor(isSurplus ? 21 : 185, isSurplus ? 128 : 28, isSurplus ? 61 : 28);
+    doc.text(isSurplus ? 'Closing Refundable (Credit):' : 'Net Amount Due (Payable):', x + 5, curY + 7.5);
+    doc.setFontSize(9);
+    doc.text(`Tk ${Math.abs(bSum.balance).toFixed(2)}`, x + slipWidth - 5, curY + 8, { align: 'right' });
+
+    // Notes / Instructions line
+    curY += 15;
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(5.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(customNotes, x + 3.5, curY);
+
+    // Dual Signatures
+    curY += 10;
+    doc.setDrawColor(148, 163, 184);
+    doc.setLineWidth(0.25);
+    doc.line(x + 5, curY, x + 34, curY);
+    doc.line(x + slipWidth - 34, curY, x + slipWidth - 5, curY);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(5.6);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Boarder Signature', x + 19.5, curY + 3.2, { align: 'center' });
+    doc.text('Manager Seal & Sig', x + slipWidth - 19.5, curY + 3.2, { align: 'center' });
+
+    // Draw middle perforation guidelines on each page
+    const isLastOnPage = pageIndex === slipsPerPage - 1 || index === report.boardersReport.length - 1;
+    if (isLastOnPage) {
+      // Vertical perforation between column 0 and column 1
+      const midX = leftMargin + slipWidth + colGap / 2;
+      doc.setDrawColor(180, 195, 210);
+      doc.setLineWidth(0.2);
+      doc.setLineDashPattern([2, 2], 0);
+      doc.line(midX, topMargin - 2, midX, topMargin + 2 * slipHeight + rowGap + 2);
+
+      // Horizontal perforation between row 0 and row 1
+      const midY = topMargin + slipHeight + rowGap / 2;
+      doc.line(leftMargin - 2, midY, pageWidth - leftMargin + 2, midY);
+      doc.setLineDashPattern([], 0); // reset dash pattern
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(5.5);
+      doc.setTextColor(148, 163, 184);
+      doc.text('✂ Cut Along Guidelines ✂', midX, midY - 0.6, { align: 'center' });
+    }
+  });
+
+  // Footer on all pages
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text(
+      `${settings.messName || 'Mess'} • Member Financial Vouchers (${activeMonthStr}) • Page ${i} of ${totalPages}`,
+      pageWidth / 2,
+      pageHeight - 4,
+      { align: 'center' }
+    );
+  }
+
+  return doc;
+}
+
+export interface PersonalVoucherPdfOptions {
+  managerName?: string;
+  managerPhone?: string;
+  customNotes?: string;
+}
+
+/**
+ * Generates an official, pure vector individual member financial voucher (A5 format).
+ * Renders directly via jsPDF and jspdf-autotable - no raster screenshots.
+ */
+export function generatePersonalVoucherPdf(
+  boarder: Boarder,
+  report: MonthReport,
+  deposits: Deposit[],
+  settings: MessSettings,
+  options: PersonalVoucherPdfOptions = {}
+): jsPDF {
+  const {
+    managerName = 'Mess Manager',
+    managerPhone = '',
+    customNotes = 'Please verify your meal consumption and deposit payments. Keep this slip for your personal records.',
+  } = options;
+
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a5', // 148 x 210 mm
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const activeMonthStr = formatReadableMonth(report.month);
+
+  const summary = report.boardersReport.find(r => r.boarderId === boarder.id) || {
+    boarderId: boarder.id,
+    boarderName: boarder.name,
+    totalMeals: 0,
+    mealCost: 0,
+    fixedCostShare: 0,
+    totalCost: 0,
+    totalDeposit: 0,
+    balance: 0,
+    status: 'Settled' as const,
+  };
+
+  const isSurplus = summary.balance >= 0;
+  const boarderDeposits = deposits.filter(d => d.boarderId === boarder.id && d.date.startsWith(report.month));
+
+  // Outer border
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.5);
+  doc.rect(8, 8, pageWidth - 16, pageHeight - 16);
+
+  // Top header box
+  doc.setFillColor(248, 250, 252);
+  doc.rect(8.5, 8.5, pageWidth - 17, 24, 'F');
+  doc.setDrawColor(226, 232, 240);
+  doc.line(8, 32.5, pageWidth - 8, 32.5);
+
+  // Mess Title
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(15, 23, 42);
+  doc.text((settings.messName || 'Mess').toUpperCase(), 14, 18);
+
+  // Subtitle
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text(`OFFICIAL MEMBER EXPENSE & MEAL SLIP - ${activeMonthStr.toUpperCase()}`, 14, 24);
+
+  // Timestamp
+  const now = new Date();
+  doc.setFontSize(7);
+  doc.setTextColor(148, 163, 184);
+  doc.text(`Issued: ${now.toLocaleDateString('en-GB')}`, pageWidth - 14, 24, { align: 'right' });
+
+  // Member Information Card
+  let curY = 38;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`Member: ${boarder.name}`, 14, curY);
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(71, 85, 105);
+  const roomInfo = boarder.roomNo ? `Room: ${boarder.roomNo}` : 'General';
+  const phoneInfo = boarder.phone ? ` • Phone: ${boarder.phone}` : '';
+  doc.text(`${roomInfo}${phoneInfo} • Status: ${boarder.isActive ? 'Active' : 'Inactive'}`, 14, curY + 5);
+
+  // Status Badge
+  doc.setFillColor(isSurplus ? 220 : 254, isSurplus ? 252 : 226, isSurplus ? 231 : 226);
+  doc.roundedRect(pageWidth - 48, curY - 5, 34, 7, 1.5, 1.5, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(isSurplus ? 21 : 185, isSurplus ? 128 : 28, isSurplus ? 61 : 28);
+  doc.text(isSurplus ? 'CREDIT / REFUNDABLE' : 'OUTSTANDING DUE', pageWidth - 31, curY - 0.5, { align: 'center' });
+
+  curY += 12;
+
+  // Financial Breakdown autoTable
+  autoTable(doc, {
+    startY: curY,
+    margin: { left: 14, right: 14 },
+    head: [['Description / Expense Category', 'Calculation Basis', 'Amount (Tk)']],
+    body: [
+      [
+        'Total Meals Consumed',
+        `${summary.totalMeals.toFixed(1)} meals @ Tk ${report.mealRate.toFixed(4)}/meal`,
+        `Tk ${summary.mealCost.toFixed(2)}`,
+      ],
+      [
+        'Shared Utility & Fixed Costs Share',
+        'Equal division among active members',
+        `Tk ${summary.fixedCostShare.toFixed(2)}`,
+      ],
+      [
+        'Total Monthly Charges (A)',
+        'Sum of Meal Cost + Shared Fixed Overhead',
+        `Tk ${summary.totalCost.toFixed(2)}`,
+      ],
+      [
+        'Total Advance Deposits Paid (B)',
+        `${boarderDeposits.length} deposit entry(s) credited`,
+        `Tk ${summary.totalDeposit.toFixed(2)}`,
+      ],
+    ],
+    foot: [
+      [
+        isSurplus ? 'Closing Refund / Credit (B - A)' : 'Net Amount Due to Pay (A - B)',
+        isSurplus ? 'Excess deposit will be refunded or adjusted' : 'Please settle with mess manager',
+        `${isSurplus ? '+' : '-'}Tk ${Math.abs(summary.balance).toFixed(2)}`,
+      ],
+    ],
+    theme: 'plain',
+    headStyles: {
+      fillColor: [241, 245, 249],
+      textColor: [15, 23, 42],
+      fontSize: 8,
+      fontStyle: 'bold',
+      cellPadding: 2.5,
+    },
+    bodyStyles: {
+      textColor: [30, 41, 59],
+      fontSize: 8,
+      cellPadding: 2.8,
+    },
+    footStyles: {
+      fillColor: isSurplus ? [240, 253, 244] : [254, 242, 242],
+      textColor: isSurplus ? [21, 128, 61] : [185, 28, 28],
+      fontSize: 9,
+      fontStyle: 'bold',
+      cellPadding: 3.5,
+    },
+    columnStyles: {
+      0: { cellWidth: 55 },
+      1: { cellWidth: 45 },
+      2: { cellWidth: 20, halign: 'right', fontStyle: 'bold' },
+    },
+    tableLineColor: [226, 232, 240],
+    tableLineWidth: 0.2,
+  });
+
+  // Deposits History subtable (if deposits exist)
+  let finalY = (doc as any).lastAutoTable?.finalY || 100;
+
+  if (boarderDeposits.length > 0 && finalY < 140) {
+    finalY += 4;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Deposit Payments Credited This Month:', 14, finalY);
+    finalY += 2;
+
+    const depRows = boarderDeposits.map(d => [
+      formatReadableDate(d.date),
+      d.note || 'Regular cash deposit',
+      `Tk ${d.amount.toFixed(2)}`,
+    ]);
+
+    autoTable(doc, {
+      startY: finalY,
+      margin: { left: 14, right: 14 },
+      head: [['Date', 'Payment Note / Method', 'Amount (Tk)']],
+      body: depRows,
+      theme: 'plain',
+      headStyles: {
+        fillColor: [248, 250, 252],
+        textColor: [71, 85, 105],
+        fontSize: 7,
+        fontStyle: 'bold',
+        cellPadding: 1.8,
+      },
+      bodyStyles: {
+        textColor: [51, 65, 85],
+        fontSize: 7,
+        cellPadding: 2,
+      },
+      columnStyles: {
+        0: { cellWidth: 35 },
+        1: { cellWidth: 65 },
+        2: { cellWidth: 20, halign: 'right', fontStyle: 'bold' },
+      },
+      tableLineColor: [241, 245, 249],
+      tableLineWidth: 0.2,
+    });
+
+    finalY = (doc as any).lastAutoTable?.finalY || finalY + 20;
+  }
+
+  // Notes box
+  finalY += 4;
+  doc.setFillColor(248, 250, 252);
+  doc.roundedRect(14, finalY, pageWidth - 28, 12, 1, 1, 'F');
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(`Note: ${customNotes}`, 17, finalY + 4.5);
+  if (managerPhone) {
+    doc.text(`Manager: ${managerName} • Contact: ${managerPhone}`, 17, finalY + 8.5);
+  } else {
+    doc.text(`Manager: ${managerName} • Generated via MessMaster Portal`, 17, finalY + 8.5);
+  }
+
+  // Signatures at bottom
+  const sigY = pageHeight - 18;
+  doc.setDrawColor(148, 163, 184);
+  doc.setLineWidth(0.3);
+  doc.line(18, sigY, 55, sigY);
+  doc.line(pageWidth - 55, sigY, pageWidth - 18, sigY);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(100, 116, 139);
+  doc.text('Boarder Signature', 36.5, sigY + 4, { align: 'center' });
+  doc.text('Manager Signature & Seal', pageWidth - 36.5, sigY + 4, { align: 'center' });
+
+  return doc;
+}
+
