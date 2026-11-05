@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Cloud, 
   CloudLightning, 
@@ -67,10 +68,10 @@ export default function CloudSyncModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/75 backdrop-blur-xs flex items-start sm:items-center justify-center p-3 sm:p-4 py-8 animate-fadeIn">
       <div 
-        className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]"
+        className="bg-white rounded-2xl shadow-2xl max-w-lg w-full my-auto border border-slate-200 overflow-hidden flex flex-col max-h-[calc(100vh-3rem)] sm:max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -299,6 +300,7 @@ export default function CloudSyncModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

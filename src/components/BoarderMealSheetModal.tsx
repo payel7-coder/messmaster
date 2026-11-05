@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   X, 
   Download, 
@@ -185,11 +186,11 @@ export default function BoarderMealSheetModal({
     });
   };
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 print:p-0 print:bg-white print:static print:overflow-visible animate-fadeIn">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/75 backdrop-blur-xs flex items-start sm:items-center justify-center p-2 sm:p-4 py-6 sm:py-8 print:p-0 print:bg-white print:static print:overflow-visible animate-fadeIn">
       
       {/* Modal Dialog Box */}
-      <div className="bg-white w-full max-w-7xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[94vh] print:max-h-none print:border-none print:shadow-none print:rounded-none">
+      <div className="bg-white w-full max-w-7xl my-auto rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[calc(100vh-3rem)] sm:max-h-[94vh] print:max-h-none print:border-none print:shadow-none print:rounded-none">
         
         {/* Top Header Bar */}
         <div className="bg-slate-900 text-white px-6 py-4 flex items-center justify-between border-b border-slate-800 print:hidden">
@@ -579,6 +580,7 @@ export default function BoarderMealSheetModal({
 
       </div>
 
-    </div>
+    </div>,
+    document.body
   );
 }

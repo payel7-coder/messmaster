@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { downloadElementAsPdf } from '../utils/pdfExportHelper';
 import { 
   TrendingUp, 
@@ -472,9 +473,9 @@ export default function BoarderDashboard({
       </div>
 
       {/* Personal Monthly Voucher Slip Modal for the Boarder */}
-      {showSlipModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 print:p-0 print:bg-white print:static print:overflow-visible animate-fadeIn">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col print:border-none print:shadow-none print:rounded-none">
+      {showSlipModal && createPortal(
+        <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-900/75 backdrop-blur-xs flex items-start sm:items-center justify-center p-3 sm:p-6 py-8 sm:py-10 print:p-0 print:bg-white print:static print:overflow-visible animate-fadeIn">
+          <div className="bg-white w-full max-w-2xl my-auto rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col print:border-none print:shadow-none print:rounded-none">
             
             {/* Modal Actions Header (Hidden in Print) */}
             <div className="bg-slate-900 text-white px-5 py-3.5 flex items-center justify-between border-b border-slate-800 print:hidden shrink-0">
@@ -626,7 +627,8 @@ export default function BoarderDashboard({
             </div>
 
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>

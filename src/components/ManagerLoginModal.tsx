@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Lock, 
   Eye, 
@@ -245,10 +246,10 @@ export default function ManagerLoginModal({
     validateAndSubmitPin(def);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-fadeIn">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] overflow-y-auto bg-slate-950/75 backdrop-blur-xs flex items-start sm:items-center justify-center p-3 sm:p-4 py-8 animate-fadeIn">
       <div 
-        className={`bg-white rounded-2xl shadow-2xl border border-slate-200/80 max-w-lg w-full overflow-hidden transition-all duration-200 ${
+        className={`bg-white rounded-2xl shadow-2xl border border-slate-200/80 max-w-lg w-full my-auto overflow-hidden transition-all duration-200 ${
           isShaking ? 'animate-shake' : ''
         }`}
         onClick={(e) => e.stopPropagation()}
@@ -769,6 +770,7 @@ export default function ManagerLoginModal({
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
