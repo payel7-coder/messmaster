@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Utensils, 
@@ -29,12 +29,14 @@ import {
   Activity,
   Lock,
   Unlock,
-  Target
+  Target,
+  Coffee
 } from 'lucide-react';
 import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, CustomFixedBill, StandardFixedBillKey } from '../types';
 import { getDatesInMonth, formatReadableDate, formatReadableMonth } from '../utils';
 import PrintablePdfReportModal from './PrintablePdfReportModal';
 import BoarderMealSheetModal from './BoarderMealSheetModal';
+import BreakfastAuditModal from './BreakfastAuditModal';
 import RecentActivitiesSection from './RecentActivitiesSection';
 import {
   syncBoarderToFirestore,
@@ -84,9 +86,24 @@ export default function ManagerDashboard({
   const [activeTab, setActiveTab] = useState<TabType>('meals');
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [showMealSheetModal, setShowMealSheetModal] = useState(false);
+  const [showBreakfastAuditModal, setShowBreakfastAuditModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
   const [dashboardPinInput, setDashboardPinInput] = useState(settings.managerPin || '1234');
   const [dashboardPinSuccess, setDashboardPinSuccess] = useState(false);
+
+  // Compute number of active boarders below minimum breakfast rule for current month
+  const minBreakfastDays = settings.minBreakfastDays || 16;
+  const breakfastDefaultersCount = useMemo(() => {
+    const activeBoarders = boarders.filter(b => b.isActive);
+    const monthLogs = mealLogs.filter(l => l.date.startsWith(settings.currentMonth));
+    return activeBoarders.filter(b => {
+      const bDays = monthLogs.filter(l => {
+        const m = l.meals[b.id] || 0;
+        return (m % 1 >= 0.45 && m % 1 <= 0.55) || m === 0.5;
+      }).length;
+      return bDays < minBreakfastDays;
+    }).length;
+  }, [boarders, mealLogs, settings.currentMonth, minBreakfastDays]);
 
   useEffect(() => {
     setDashboardPinInput(settings.managerPin || '1234');
@@ -1227,7 +1244,16 @@ export default function ManagerDashboard({
             }`}
           >
             <Utensils className="w-4 h-4" />
-            Daily Meals
+            <span>Daily Meals</span>
+            {breakfastDefaultersCount > 0 && (
+              <span 
+                className="bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold px-1.5 py-0.2 rounded-full flex items-center gap-1"
+                title={`${breakfastDefaultersCount} boarder(s) below ${minBreakfastDays} days breakfast`}
+              >
+                <Coffee className="w-2.5 h-2.5 text-amber-700" />
+                <span>{breakfastDefaultersCount} below 16d</span>
+              </span>
+            )}
           </button>
 
           <button
@@ -1314,15 +1340,31 @@ export default function ManagerDashboard({
                 <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Select Date to Edit</h4>
                 <p className="text-[10px] text-gray-500 mt-0.5">Click any day to update members' meal counts</p>
               </div>
-              <button
-                onClick={() => setShowMealSheetModal(true)}
-                id="btn-meals-tab-meal-sheet"
-                className="flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg cursor-pointer transition-colors shadow-2xs shrink-0"
-                title="View & Export full 31-day meal sheet PDF"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Meal Sheet PDF</span>
-              </button>
+              <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+                <button
+                  onClick={() => setShowBreakfastAuditModal(true)}
+                  id="btn-meals-tab-breakfast-audit"
+                  className="flex items-center gap-1.5 text-[11px] font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-lg cursor-pointer transition-colors shadow-2xs shrink-0"
+                  title="Breakfast Audit: Check boarders below 16 days & apply meal fines"
+                >
+                  <Coffee className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Breakfast Audit</span>
+                  {breakfastDefaultersCount > 0 && (
+                    <span className="bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full">
+                      {breakfastDefaultersCount}
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowMealSheetModal(true)}
+                  id="btn-meals-tab-meal-sheet"
+                  className="flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg cursor-pointer transition-colors shadow-2xs shrink-0"
+                  title="View & Export full 31-day meal sheet PDF"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Meal Sheet PDF</span>
+                </button>
+              </div>
             </div>
             
             <div className="overflow-y-auto flex-1 divide-y divide-gray-50 pr-1">
@@ -1456,6 +1498,30 @@ export default function ManagerDashboard({
                   )}
                 </div>
               </div>
+
+              {/* Alert Banner for Boarders below 16 days breakfast */}
+              {breakfastDefaultersCount > 0 && (
+                <div className="mb-4 bg-amber-50/90 border border-amber-300/80 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-950 animate-fadeIn">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+                      <Coffee className="w-4 h-4 text-amber-700" />
+                    </div>
+                    <div>
+                      <span className="font-bold text-amber-950">Breakfast Attendance Alert: </span>
+                      <span className="text-amber-800 text-[11px]">
+                        <strong>{breakfastDefaultersCount} boarder(s)</strong> have eaten breakfast on fewer than {minBreakfastDays} days this month.
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowBreakfastAuditModal(true)}
+                    className="self-end sm:self-auto flex items-center gap-1.5 bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs px-3 py-1.5 rounded-lg cursor-pointer transition-colors shadow-2xs shrink-0"
+                  >
+                    <span>Audit & Apply Meal Fine</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
 
               {/* Informational Banner when Locked */}
               {!isEditingMeals ? (
@@ -3121,6 +3187,17 @@ export default function ManagerDashboard({
         mealLogs={mealLogs}
         settings={settings}
         report={report}
+      />
+
+      {/* Breakfast 16-Day Attendance Audit & Meal Fine Modal */}
+      <BreakfastAuditModal
+        isOpen={showBreakfastAuditModal}
+        onClose={() => setShowBreakfastAuditModal(false)}
+        boarders={boarders}
+        mealLogs={mealLogs}
+        setMealLogs={setMealLogs}
+        settings={settings}
+        setSettings={setSettings}
       />
 
       {/* Quick Security PIN Modal */}

@@ -18,7 +18,8 @@ import {
   Download,
   X,
   CheckCircle2,
-  Lock
+  Lock,
+  Coffee
 } from 'lucide-react';
 import { Boarder, Deposit, DailyMealLog, MonthReport, BoarderSummary, MessSettings, BazaarCost, MiscellaneousCosts } from '../types';
 import { formatReadableDate, formatReadableMonth } from '../utils';
@@ -97,6 +98,19 @@ export default function BoarderDashboard({
   const budgetUtilization = summary.totalDeposit > 0 
     ? Math.min(100, Math.round((summary.totalCost / summary.totalDeposit) * 100))
     : 0;
+
+  // Minimum breakfast rule check (default 16 days)
+  const minBreakfastDays = settings?.minBreakfastDays || 16;
+  const myBreakfastDays = myMealLogs.filter(m => {
+    const c = m.count;
+    return (c % 1 >= 0.45 && c % 1 <= 0.55) || c === 0.5;
+  }).length;
+  const breakfastShortfall = Math.max(0, minBreakfastDays - myBreakfastDays);
+  const isBreakfastShort = myBreakfastDays < minBreakfastDays;
+  const breakfastPct = Math.min(100, Math.round((myBreakfastDays / minBreakfastDays) * 100));
+  const myFineRecord = (settings?.breakfastFines || []).find(
+    f => f.boarderId === boarder.id && f.month === report.month
+  );
 
   return (
     <div className="space-y-6 animate-fadeIn text-slate-800">
@@ -257,6 +271,68 @@ export default function BoarderDashboard({
           )}
         </div>
       )}
+
+      {/* Breakfast Attendance Rule (16 Days Minimum) Card */}
+      <div className={`p-5 rounded-xl border shadow-xs ${
+        isBreakfastShort 
+          ? 'bg-amber-50/40 border-amber-200' 
+          : 'bg-emerald-50/30 border-emerald-200'
+      }`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2.5">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+              isBreakfastShort ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+            }`}>
+              <Coffee className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-slate-800">
+                Breakfast Attendance (Minimum {minBreakfastDays} Days Rule)
+              </h4>
+              <p className="text-xs text-slate-500">
+                Mess rule requires every member to eat breakfast on at least {minBreakfastDays} days monthly
+              </p>
+            </div>
+          </div>
+          <span className={`text-xs font-bold px-2.5 py-1 rounded-full border self-start sm:self-auto ${
+            isBreakfastShort 
+              ? 'bg-rose-100 text-rose-800 border-rose-300' 
+              : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+          }`}>
+            {isBreakfastShort ? `${breakfastShortfall} Days Short of Rule` : `Rule Met (${myBreakfastDays} Days)`}
+          </span>
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-slate-700">
+              Breakfasts Attended: <strong className="text-slate-900">{myBreakfastDays}</strong> of {minBreakfastDays} required days
+            </span>
+            <span className={`font-bold ${isBreakfastShort ? 'text-rose-600' : 'text-emerald-700'}`}>
+              {breakfastPct}%
+            </span>
+          </div>
+          <div className="w-full bg-slate-200/80 rounded-full h-2.5 overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${
+                isBreakfastShort ? 'bg-amber-500' : 'bg-emerald-500'
+              }`}
+              style={{ width: `${breakfastPct}%` }}
+            />
+          </div>
+        </div>
+
+        {myFineRecord && (
+          <div className="mt-3 p-2.5 bg-amber-100/70 border border-amber-300 text-amber-900 text-xs rounded-lg flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-amber-700 shrink-0" />
+              <span>
+                <strong>Penalty Meal Fine Applied:</strong> +{myFineRecord.fineMeals} meals on {formatReadableDate(myFineRecord.dateApplied)} ({myFineRecord.note || 'Breakfast shortfall'}).
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Detailed calculation breakdown audit sheet */}
       <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200 shadow-xs space-y-4">

@@ -67,12 +67,26 @@ export interface MiscellaneousCosts {
   };
 }
 
+export interface BreakfastFineRecord {
+  id: string;
+  boarderId: string;
+  month: string; // YYYY-MM
+  breakfastDays: number;
+  shortfallDays: number;
+  fineMeals: number; // Penalty meals applied
+  dateApplied: string; // YYYY-MM-DD
+  appliedAt: string; // ISO timestamp
+  note?: string;
+}
+
 export interface MessSettings {
   messName: string;
   currentMonth: string; // YYYY-MM (e.g., "2026-07")
   managerPin?: string; // Optional custom PIN for manager authentication (defaults to "1234")
   monthlyBudgetTarget?: number; // Target total monthly expenditure in Taka
   registeredManagerEmails?: string[]; // Authorized manager emails eligible for Google SSO
+  minBreakfastDays?: number; // Minimum breakfast days required per month (defaults to 16)
+  breakfastFines?: BreakfastFineRecord[]; // History of applied breakfast shortfall meal fines
 }
 
 export interface RegisteredManager {
