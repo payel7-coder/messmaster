@@ -585,32 +585,73 @@ export default function PrintablePdfReportModal({
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
                     <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-lg">
-                      <div className="text-[10px] text-slate-500">House / Room Rent</div>
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-slate-500">House / Room Rent</span>
+                        {miscCosts.paidFromCash?.houseRent && (
+                          <span className="text-[8px] font-bold bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-mono">Cash Paid</span>
+                        )}
+                      </div>
                       <div className="font-bold text-slate-800 font-mono mt-0.5">৳ {miscCosts.houseRent.toLocaleString('en-IN')}</div>
                     </div>
+
                     <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-lg">
-                      <div className="text-[10px] text-slate-500">Cooker / Maid Salary</div>
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-slate-500">Cooker / Maid Salary</span>
+                        {miscCosts.paidFromCash?.cookerBill && (
+                          <span className="text-[8px] font-bold bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-mono">Cash Paid</span>
+                        )}
+                      </div>
                       <div className="font-bold text-slate-800 font-mono mt-0.5">৳ {miscCosts.cookerBill.toLocaleString('en-IN')}</div>
                     </div>
+
                     <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-lg">
-                      <div className="text-[10px] text-slate-500">Gas Cylinder & Supply</div>
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-slate-500">Gas Cylinder & Supply</span>
+                        {miscCosts.paidFromCash?.gasBill && (
+                          <span className="text-[8px] font-bold bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-mono">Cash Paid</span>
+                        )}
+                      </div>
                       <div className="font-bold text-slate-800 font-mono mt-0.5">৳ {miscCosts.gasBill.toLocaleString('en-IN')}</div>
                     </div>
+
                     <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-lg">
-                      <div className="text-[10px] text-slate-500">Electricity & Utilities</div>
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-slate-500">Electricity & Utilities</span>
+                        {miscCosts.paidFromCash?.utilityBill && (
+                          <span className="text-[8px] font-bold bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-mono">Cash Paid</span>
+                        )}
+                      </div>
                       <div className="font-bold text-slate-800 font-mono mt-0.5">৳ {miscCosts.utilityBill.toLocaleString('en-IN')}</div>
                     </div>
+
                     <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-lg">
-                      <div className="text-[10px] text-slate-500">WiFi & Internet</div>
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-slate-500">WiFi & Internet</span>
+                        {miscCosts.paidFromCash?.wifiBill && (
+                          <span className="text-[8px] font-bold bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-mono">Cash Paid</span>
+                        )}
+                      </div>
                       <div className="font-bold text-slate-800 font-mono mt-0.5">৳ {miscCosts.wifiBill.toLocaleString('en-IN')}</div>
                     </div>
+
                     <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-lg">
-                      <div className="text-[10px] text-slate-500">Other / Cleaning / Misc</div>
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-slate-500">Other / Cleaning / Misc</span>
+                        {miscCosts.paidFromCash?.otherCosts && (
+                          <span className="text-[8px] font-bold bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-mono">Cash Paid</span>
+                        )}
+                      </div>
                       <div className="font-bold text-slate-800 font-mono mt-0.5">৳ {miscCosts.otherCosts.toLocaleString('en-IN')}</div>
                     </div>
+
                     {miscCosts.customBills?.map((cb) => (
                       <div key={cb.id} className="bg-blue-50/50 border border-blue-200/70 p-2.5 rounded-lg">
-                        <div className="text-[10px] text-blue-700 font-semibold truncate" title={cb.name}>{cb.name}</div>
+                        <div className="flex items-center justify-between text-[10px]">
+                          <span className="text-blue-700 font-semibold truncate" title={cb.name}>{cb.name}</span>
+                          {cb.paidFromCash && (
+                            <span className="text-[8px] font-bold bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-mono">Cash Paid</span>
+                          )}
+                        </div>
                         <div className="font-bold text-slate-800 font-mono mt-0.5">৳ {Number(cb.amount).toLocaleString('en-IN')}</div>
                       </div>
                     ))}

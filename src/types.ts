@@ -41,7 +41,12 @@ export interface CustomFixedBill {
   id: string;
   name: string; // Category name (e.g., "Dustbin / Waste", "Newspaper", "Security Guard", "Water Jar")
   amount: number; // in Taka
+  paidFromCash?: boolean; // Whether this bill was given/paid directly from mess cash
+  paidDate?: string; // Optional payment date
+  paidNote?: string; // Optional note
 }
+
+export type StandardFixedBillKey = 'cookerBill' | 'utilityBill' | 'gasBill' | 'wifiBill' | 'houseRent' | 'otherCosts';
 
 export interface MiscellaneousCosts {
   cookerBill: number;
@@ -51,6 +56,15 @@ export interface MiscellaneousCosts {
   houseRent: number;
   otherCosts: number;
   customBills?: CustomFixedBill[]; // Optional additional categories for fixed bills
+  paidFromCash?: {
+    cookerBill?: boolean;
+    utilityBill?: boolean;
+    gasBill?: boolean;
+    wifiBill?: boolean;
+    houseRent?: boolean;
+    otherCosts?: boolean;
+    [key: string]: boolean | undefined;
+  };
 }
 
 export interface MessSettings {

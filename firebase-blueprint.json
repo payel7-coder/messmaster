@@ -64,7 +64,8 @@
         "wifiBill": { "type": "number" },
         "houseRent": { "type": "number" },
         "otherCosts": { "type": "number" },
-        "customBills": { "type": "array" }
+        "customBills": { "type": "array" },
+        "paidFromCash": { "type": "object" }
       },
       "required": ["cookerBill", "utilityBill", "gasBill", "wifiBill", "houseRent", "otherCosts"]
     },

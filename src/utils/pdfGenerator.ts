@@ -234,17 +234,17 @@ export function generateMonthlyReportPdf(
     currentY += 2;
 
     const fixedItems: string[][] = [
-      ['House Rent', `Tk ${miscCosts.houseRent.toLocaleString('en-IN')}`, 'Equally shared among active members'],
-      ['Cooker / Maid Salary', `Tk ${miscCosts.cookerBill.toLocaleString('en-IN')}`, 'Equally shared among active members'],
-      ['Gas Bill', `Tk ${miscCosts.gasBill.toLocaleString('en-IN')}`, 'Equally shared among active members'],
-      ['Electricity & Utility', `Tk ${miscCosts.utilityBill.toLocaleString('en-IN')}`, 'Equally shared among active members'],
-      ['WiFi & Internet', `Tk ${miscCosts.wifiBill.toLocaleString('en-IN')}`, 'Equally shared among active members'],
-      ['Other / Cleaning / Misc', `Tk ${miscCosts.otherCosts.toLocaleString('en-IN')}`, 'Equally shared among active members'],
+      ['House Rent', `Tk ${miscCosts.houseRent.toLocaleString('en-IN')}`, miscCosts.paidFromCash?.houseRent ? 'Equally shared [Paid from Cash]' : 'Equally shared among active members'],
+      ['Cooker / Maid Salary', `Tk ${miscCosts.cookerBill.toLocaleString('en-IN')}`, miscCosts.paidFromCash?.cookerBill ? 'Equally shared [Paid from Cash]' : 'Equally shared among active members'],
+      ['Gas Bill', `Tk ${miscCosts.gasBill.toLocaleString('en-IN')}`, miscCosts.paidFromCash?.gasBill ? 'Equally shared [Paid from Cash]' : 'Equally shared among active members'],
+      ['Electricity & Utility', `Tk ${miscCosts.utilityBill.toLocaleString('en-IN')}`, miscCosts.paidFromCash?.utilityBill ? 'Equally shared [Paid from Cash]' : 'Equally shared among active members'],
+      ['WiFi & Internet', `Tk ${miscCosts.wifiBill.toLocaleString('en-IN')}`, miscCosts.paidFromCash?.wifiBill ? 'Equally shared [Paid from Cash]' : 'Equally shared among active members'],
+      ['Other / Cleaning / Misc', `Tk ${miscCosts.otherCosts.toLocaleString('en-IN')}`, miscCosts.paidFromCash?.otherCosts ? 'Equally shared [Paid from Cash]' : 'Equally shared among active members'],
     ];
 
     if (miscCosts.customBills && miscCosts.customBills.length > 0) {
       miscCosts.customBills.forEach(cb => {
-        fixedItems.push([cb.name, `Tk ${Number(cb.amount).toLocaleString('en-IN')}`, 'Equally shared among active members (Custom Category)']);
+        fixedItems.push([cb.name, `Tk ${Number(cb.amount).toLocaleString('en-IN')}`, cb.paidFromCash ? 'Equally shared [Paid from Cash]' : 'Equally shared among active members (Custom Category)']);
       });
     }
 

@@ -31,7 +31,7 @@ import {
   Unlock,
   Target
 } from 'lucide-react';
-import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, CustomFixedBill } from '../types';
+import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, CustomFixedBill, StandardFixedBillKey } from '../types';
 import { getDatesInMonth, formatReadableDate, formatReadableMonth } from '../utils';
 import PrintablePdfReportModal from './PrintablePdfReportModal';
 import BoarderMealSheetModal from './BoarderMealSheetModal';
@@ -381,7 +381,7 @@ export default function ManagerDashboard({
     setTimeout(() => setDepositSuccessMsg(null), 5000);
   };
 
-  const handleUpdateStandardFixedCost = (field: keyof MiscellaneousCosts, val: number) => {
+  const handleUpdateStandardFixedCost = (field: StandardFixedBillKey, val: number) => {
     const updated = {
       ...miscCosts,
       [field]: isNaN(val) ? 0 : Math.max(0, val)
@@ -390,9 +390,24 @@ export default function ManagerDashboard({
     syncMiscCostsToFirestore(updated);
   };
 
+  const handleToggleStandardFixedPaidFromCash = (field: StandardFixedBillKey, paid: boolean) => {
+    const currentPaid = miscCosts.paidFromCash || {};
+    const updatedPaid = {
+      ...currentPaid,
+      [field]: paid
+    };
+    const updated: MiscellaneousCosts = {
+      ...miscCosts,
+      paidFromCash: updatedPaid
+    };
+    setMiscCosts(updated);
+    syncMiscCostsToFirestore(updated);
+  };
+
   // --- Custom Fixed Bill Category State ---
   const [newFixedCategoryName, setNewFixedCategoryName] = useState<string>('');
   const [newFixedCategoryAmount, setNewFixedCategoryAmount] = useState<string>('');
+  const [newFixedCategoryPaidFromCash, setNewFixedCategoryPaidFromCash] = useState<boolean>(false);
   const [customFixedError, setCustomFixedError] = useState<string | null>(null);
   const [customFixedSuccess, setCustomFixedSuccess] = useState<string | null>(null);
   const [showAddCustomForm, setShowAddCustomForm] = useState<boolean>(false);
@@ -423,19 +438,22 @@ export default function ManagerDashboard({
     const newBill: CustomFixedBill = {
       id: `cb_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       name,
-      amount: amt
+      amount: amt,
+      paidFromCash: newFixedCategoryPaidFromCash
     };
 
     const updatedBills = [...(miscCosts.customBills || []), newBill];
-    setMiscCosts(prev => ({
-      ...prev,
+    const updated: MiscellaneousCosts = {
+      ...miscCosts,
       customBills: updatedBills
-    }));
-    syncMiscCostsToFirestore({ ...miscCosts, customBills: updatedBills });
+    };
+    setMiscCosts(updated);
+    syncMiscCostsToFirestore(updated);
 
     setNewFixedCategoryName('');
     setNewFixedCategoryAmount('');
-    setCustomFixedSuccess(`Added category "${name}" (৳${amt}) to shared fixed bills!`);
+    setNewFixedCategoryPaidFromCash(false);
+    setCustomFixedSuccess(`Added category "${name}" (৳${amt}) to shared fixed bills${newBill.paidFromCash ? ' [Paid from Cash]' : ''}!`);
     setShowAddCustomForm(false);
     setTimeout(() => setCustomFixedSuccess(null), 3000);
   };
@@ -444,20 +462,34 @@ export default function ManagerDashboard({
     const updatedBills = (miscCosts.customBills || []).map(b => 
       b.id === id ? { ...b, amount: isNaN(amount) ? 0 : Math.max(0, amount) } : b
     );
-    setMiscCosts(prev => ({
-      ...prev,
+    const updated: MiscellaneousCosts = {
+      ...miscCosts,
       customBills: updatedBills
-    }));
-    syncMiscCostsToFirestore({ ...miscCosts, customBills: updatedBills });
+    };
+    setMiscCosts(updated);
+    syncMiscCostsToFirestore(updated);
+  };
+
+  const handleToggleCustomBillPaidFromCash = (id: string, paid: boolean) => {
+    const updatedBills = (miscCosts.customBills || []).map(b => 
+      b.id === id ? { ...b, paidFromCash: paid } : b
+    );
+    const updated: MiscellaneousCosts = {
+      ...miscCosts,
+      customBills: updatedBills
+    };
+    setMiscCosts(updated);
+    syncMiscCostsToFirestore(updated);
   };
 
   const handleDeleteCustomBill = (id: string) => {
     const updatedBills = (miscCosts.customBills || []).filter(b => b.id !== id);
-    setMiscCosts(prev => ({
-      ...prev,
+    const updated: MiscellaneousCosts = {
+      ...miscCosts,
       customBills: updatedBills
-    }));
-    syncMiscCostsToFirestore({ ...miscCosts, customBills: updatedBills });
+    };
+    setMiscCosts(updated);
+    syncMiscCostsToFirestore(updated);
   };
 
   // Find or create meal log for the selected date
@@ -837,7 +869,24 @@ export default function ManagerDashboard({
     return sum;
   }, 0);
   const totalCashDeposited = report.totalDeposits;
-  const remainingCash = totalCashDeposited - totalBazaarCashPaid;
+
+  // Fixed Bills Outflow (Bills marked as paid directly from mess cash in hand)
+  const standardFixedBillsPaidFromCash = (
+    (miscCosts.paidFromCash?.cookerBill ? (miscCosts.cookerBill || 0) : 0) +
+    (miscCosts.paidFromCash?.utilityBill ? (miscCosts.utilityBill || 0) : 0) +
+    (miscCosts.paidFromCash?.gasBill ? (miscCosts.gasBill || 0) : 0) +
+    (miscCosts.paidFromCash?.wifiBill ? (miscCosts.wifiBill || 0) : 0) +
+    (miscCosts.paidFromCash?.houseRent ? (miscCosts.houseRent || 0) : 0) +
+    (miscCosts.paidFromCash?.otherCosts ? (miscCosts.otherCosts || 0) : 0)
+  );
+
+  const customFixedBillsPaidFromCash = (miscCosts.customBills || []).reduce(
+    (sum, b) => sum + (b.paidFromCash ? (b.amount || 0) : 0),
+    0
+  );
+
+  const totalFixedBillsPaidFromCash = standardFixedBillsPaidFromCash + customFixedBillsPaidFromCash;
+  const remainingCash = totalCashDeposited - totalBazaarCashPaid - totalFixedBillsPaidFromCash;
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -949,14 +998,26 @@ export default function ManagerDashboard({
           </span>
         </div>
 
-        <div className={`p-4 rounded-xl shadow-xs border ${
+        <div className={`p-4 rounded-xl shadow-xs border transition-colors ${
           remainingCash >= 0 ? 'bg-blue-50/40 border-blue-100' : 'bg-rose-50 border-rose-100'
         }`}>
-          <span className="text-[10px] text-slate-500 uppercase font-bold">Remaining Cash</span>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-slate-500 uppercase font-bold">Actual Cash</span>
+            {totalFixedBillsPaidFromCash > 0 && (
+              <span className="text-[8.5px] font-bold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full font-mono" title={`৳${totalFixedBillsPaidFromCash.toLocaleString('en-IN')} paid out for fixed bills`}>
+                -৳{totalFixedBillsPaidFromCash.toLocaleString('en-IN')} bills
+              </span>
+            )}
+          </div>
           <p className={`text-xl font-bold mt-1 ${remainingCash >= 0 ? 'text-blue-700' : 'text-rose-700'}`}>
             ৳ {remainingCash.toLocaleString('en-IN')}
           </p>
-          <span className="text-[9.5px] text-slate-400">Cash in Hand (হাতে নগদ)</span>
+          <span 
+            className="text-[9.5px] text-slate-500 font-medium block truncate cursor-help" 
+            title={`Actual Cash in Hand = Total Deposits (৳${totalCashDeposited.toLocaleString('en-IN')}) - Bazaar Cash (৳${totalBazaarCashPaid.toLocaleString('en-IN')}) - Fixed Bills Cash (৳${totalFixedBillsPaidFromCash.toLocaleString('en-IN')})`}
+          >
+            Cash in Hand (হাতে নগদ)
+          </span>
         </div>
 
         <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-xs">
@@ -966,9 +1027,18 @@ export default function ManagerDashboard({
         </div>
 
         <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-xs">
-          <span className="text-[10px] text-slate-500 uppercase font-bold">Fixed Bills</span>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-slate-500 uppercase font-bold">Fixed Bills</span>
+            {totalFixedBillsPaidFromCash > 0 && (
+              <span className="text-[8px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded-full font-mono">
+                ৳{totalFixedBillsPaidFromCash} cash
+              </span>
+            )}
+          </div>
           <p className="text-xl font-bold text-slate-800 mt-1">৳ {report.totalFixedCost.toLocaleString('en-IN')}</p>
-          <span className="text-[9.5px] text-slate-400">Shared utilities</span>
+          <span className="text-[9.5px] text-slate-400">
+            {totalFixedBillsPaidFromCash > 0 ? `৳${totalFixedBillsPaidFromCash.toLocaleString('en-IN')} paid from cash` : 'Shared utilities'}
+          </span>
         </div>
 
       </div>
@@ -2426,6 +2496,19 @@ export default function ManagerDashboard({
                     </div>
                   </div>
 
+                  {/* Given from Cash Checkbox for Custom Category */}
+                  <label className="flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-700 bg-white p-2.5 rounded-lg border border-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={newFixedCategoryPaidFromCash}
+                      onChange={(e) => setNewFixedCategoryPaidFromCash(e.target.checked)}
+                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300 cursor-pointer"
+                    />
+                    <span>
+                      Given directly from Cash? (ক্যাশ থেকে দেওয়া হয়েছে - deducts from cash in hand)
+                    </span>
+                  </label>
+
                   {/* Category Suggestions */}
                   <div>
                     <span className="text-[10px] text-slate-400 font-medium block mb-1">Quick Suggestions:</span>
@@ -2473,77 +2556,290 @@ export default function ManagerDashboard({
               </div>
             )}
 
+            {/* Cash Flow Impact of Fixed Bills Overview */}
+            <div className="my-5 p-4 bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-slate-50 border border-blue-200/80 rounded-xl shadow-2xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-blue-600" />
+                    <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                      Fixed Bills Paid From Cash (ক্যাশ থেকে দেওয়া বিল)
+                    </h4>
+                  </div>
+                  <p className="text-xs text-slate-600">
+                    Toggle <strong>"Given from Cash"</strong> on any bill below to mark it as disbursed from your physical mess cash. Marked bills are deducted automatically from your cash in hand.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0 bg-white border border-slate-200/80 p-2.5 rounded-xl shadow-2xs">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-semibold">Bills Paid from Cash:</span>
+                    <span className="font-extrabold text-emerald-700 font-mono text-xs sm:text-sm">
+                      ৳ {totalFixedBillsPaidFromCash.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <div className="h-7 w-px bg-slate-200" />
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-semibold">Actual Cash in Hand:</span>
+                    <span className={`font-extrabold font-mono text-xs sm:text-sm ${remainingCash >= 0 ? 'text-blue-700' : 'text-rose-700'}`}>
+                      ৳ {remainingCash.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Standard 6 Categories Grid */}
             <div className="mt-5 mb-6">
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
-                Standard Mess Fixed Bills
-              </h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Standard Mess Fixed Bills
+                </h4>
+                <span className="text-[11px] text-slate-500">
+                  {Object.values(miscCosts.paidFromCash || {}).filter(Boolean).length} of 6 paid from cash
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Cooker Bill (Taka)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={miscCosts.cookerBill === 0 ? '' : miscCosts.cookerBill}
-                    onChange={(e) => handleUpdateStandardFixedCost('cookerBill', parseFloat(e.target.value) || 0)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-xs font-semibold text-gray-800 focus:bg-white focus:ring-1 focus:ring-blue-500"
-                  />
+                {/* 1. Cooker Bill */}
+                <div className={`p-3.5 rounded-xl border transition-all ${
+                  miscCosts.paidFromCash?.cookerBill
+                    ? 'bg-emerald-50/40 border-emerald-300 shadow-2xs' 
+                    : 'bg-white border-slate-200'
+                }`}>
+                  <div className="flex items-center justify-between mb-1.5 gap-2">
+                    <label className="text-xs font-bold text-slate-800">Cooker / Maid Salary</label>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleStandardFixedPaidFromCash('cookerBill', !miscCosts.paidFromCash?.cookerBill)}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 cursor-pointer transition-colors shrink-0 ${
+                        miscCosts.paidFromCash?.cookerBill
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                      title={miscCosts.paidFromCash?.cookerBill ? "Click to mark as unpaid from cash" : "Click to mark as paid from cash"}
+                    >
+                      <DollarSign className="w-2.5 h-2.5" />
+                      <span>{miscCosts.paidFromCash?.cookerBill ? 'Paid from Cash ✓' : 'Given from Cash?'}</span>
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">৳</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={miscCosts.cookerBill === 0 ? '' : miscCosts.cookerBill}
+                      onChange={(e) => handleUpdateStandardFixedCost('cookerBill', parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-full bg-white border border-slate-200 rounded-lg pl-6 pr-2.5 py-1.5 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between text-[10px]">
+                    <span className={miscCosts.paidFromCash?.cookerBill ? "text-emerald-700 font-semibold" : "text-slate-400"}>
+                      {miscCosts.paidFromCash?.cookerBill ? 'Deducted from cash in hand' : 'Not deducted from cash'}
+                    </span>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Utility Bill (Electricity, Water - Taka)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={miscCosts.utilityBill === 0 ? '' : miscCosts.utilityBill}
-                    onChange={(e) => handleUpdateStandardFixedCost('utilityBill', parseFloat(e.target.value) || 0)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-xs font-semibold text-gray-800 focus:bg-white focus:ring-1 focus:ring-blue-500"
-                  />
+                {/* 2. Utility Bill */}
+                <div className={`p-3.5 rounded-xl border transition-all ${
+                  miscCosts.paidFromCash?.utilityBill
+                    ? 'bg-emerald-50/40 border-emerald-300 shadow-2xs' 
+                    : 'bg-white border-slate-200'
+                }`}>
+                  <div className="flex items-center justify-between mb-1.5 gap-2">
+                    <label className="text-xs font-bold text-slate-800">Utility Bill (Electricity, Water)</label>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleStandardFixedPaidFromCash('utilityBill', !miscCosts.paidFromCash?.utilityBill)}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 cursor-pointer transition-colors shrink-0 ${
+                        miscCosts.paidFromCash?.utilityBill
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                      title={miscCosts.paidFromCash?.utilityBill ? "Click to mark as unpaid from cash" : "Click to mark as paid from cash"}
+                    >
+                      <DollarSign className="w-2.5 h-2.5" />
+                      <span>{miscCosts.paidFromCash?.utilityBill ? 'Paid from Cash ✓' : 'Given from Cash?'}</span>
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">৳</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={miscCosts.utilityBill === 0 ? '' : miscCosts.utilityBill}
+                      onChange={(e) => handleUpdateStandardFixedCost('utilityBill', parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-full bg-white border border-slate-200 rounded-lg pl-6 pr-2.5 py-1.5 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between text-[10px]">
+                    <span className={miscCosts.paidFromCash?.utilityBill ? "text-emerald-700 font-semibold" : "text-slate-400"}>
+                      {miscCosts.paidFromCash?.utilityBill ? 'Deducted from cash in hand' : 'Not deducted from cash'}
+                    </span>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Gas Cylinder Bill (Taka)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={miscCosts.gasBill === 0 ? '' : miscCosts.gasBill}
-                    onChange={(e) => handleUpdateStandardFixedCost('gasBill', parseFloat(e.target.value) || 0)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-xs font-semibold text-gray-800 focus:bg-white focus:ring-1 focus:ring-blue-500"
-                  />
+                {/* 3. Gas Cylinder Bill */}
+                <div className={`p-3.5 rounded-xl border transition-all ${
+                  miscCosts.paidFromCash?.gasBill
+                    ? 'bg-emerald-50/40 border-emerald-300 shadow-2xs' 
+                    : 'bg-white border-slate-200'
+                }`}>
+                  <div className="flex items-center justify-between mb-1.5 gap-2">
+                    <label className="text-xs font-bold text-slate-800">Gas Cylinder Bill</label>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleStandardFixedPaidFromCash('gasBill', !miscCosts.paidFromCash?.gasBill)}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 cursor-pointer transition-colors shrink-0 ${
+                        miscCosts.paidFromCash?.gasBill
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                      title={miscCosts.paidFromCash?.gasBill ? "Click to mark as unpaid from cash" : "Click to mark as paid from cash"}
+                    >
+                      <DollarSign className="w-2.5 h-2.5" />
+                      <span>{miscCosts.paidFromCash?.gasBill ? 'Paid from Cash ✓' : 'Given from Cash?'}</span>
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">৳</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={miscCosts.gasBill === 0 ? '' : miscCosts.gasBill}
+                      onChange={(e) => handleUpdateStandardFixedCost('gasBill', parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-full bg-white border border-slate-200 rounded-lg pl-6 pr-2.5 py-1.5 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between text-[10px]">
+                    <span className={miscCosts.paidFromCash?.gasBill ? "text-emerald-700 font-semibold" : "text-slate-400"}>
+                      {miscCosts.paidFromCash?.gasBill ? 'Deducted from cash in hand' : 'Not deducted from cash'}
+                    </span>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">WiFi Internet Bill (Taka)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={miscCosts.wifiBill === 0 ? '' : miscCosts.wifiBill}
-                    onChange={(e) => handleUpdateStandardFixedCost('wifiBill', parseFloat(e.target.value) || 0)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-xs font-semibold text-gray-800 focus:bg-white focus:ring-1 focus:ring-blue-500"
-                  />
+                {/* 4. WiFi Internet Bill */}
+                <div className={`p-3.5 rounded-xl border transition-all ${
+                  miscCosts.paidFromCash?.wifiBill
+                    ? 'bg-emerald-50/40 border-emerald-300 shadow-2xs' 
+                    : 'bg-white border-slate-200'
+                }`}>
+                  <div className="flex items-center justify-between mb-1.5 gap-2">
+                    <label className="text-xs font-bold text-slate-800">WiFi Internet Bill</label>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleStandardFixedPaidFromCash('wifiBill', !miscCosts.paidFromCash?.wifiBill)}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 cursor-pointer transition-colors shrink-0 ${
+                        miscCosts.paidFromCash?.wifiBill
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                      title={miscCosts.paidFromCash?.wifiBill ? "Click to mark as unpaid from cash" : "Click to mark as paid from cash"}
+                    >
+                      <DollarSign className="w-2.5 h-2.5" />
+                      <span>{miscCosts.paidFromCash?.wifiBill ? 'Paid from Cash ✓' : 'Given from Cash?'}</span>
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">৳</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={miscCosts.wifiBill === 0 ? '' : miscCosts.wifiBill}
+                      onChange={(e) => handleUpdateStandardFixedCost('wifiBill', parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-full bg-white border border-slate-200 rounded-lg pl-6 pr-2.5 py-1.5 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between text-[10px]">
+                    <span className={miscCosts.paidFromCash?.wifiBill ? "text-emerald-700 font-semibold" : "text-slate-400"}>
+                      {miscCosts.paidFromCash?.wifiBill ? 'Deducted from cash in hand' : 'Not deducted from cash'}
+                    </span>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">House Rent (Taka)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={miscCosts.houseRent === 0 ? '' : miscCosts.houseRent}
-                    onChange={(e) => handleUpdateStandardFixedCost('houseRent', parseFloat(e.target.value) || 0)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-xs font-semibold text-gray-800 focus:bg-white focus:ring-1 focus:ring-blue-500"
-                  />
+                {/* 5. House Rent */}
+                <div className={`p-3.5 rounded-xl border transition-all ${
+                  miscCosts.paidFromCash?.houseRent
+                    ? 'bg-emerald-50/40 border-emerald-300 shadow-2xs' 
+                    : 'bg-white border-slate-200'
+                }`}>
+                  <div className="flex items-center justify-between mb-1.5 gap-2">
+                    <label className="text-xs font-bold text-slate-800">House / Room Rent</label>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleStandardFixedPaidFromCash('houseRent', !miscCosts.paidFromCash?.houseRent)}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 cursor-pointer transition-colors shrink-0 ${
+                        miscCosts.paidFromCash?.houseRent
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                      title={miscCosts.paidFromCash?.houseRent ? "Click to mark as unpaid from cash" : "Click to mark as paid from cash"}
+                    >
+                      <DollarSign className="w-2.5 h-2.5" />
+                      <span>{miscCosts.paidFromCash?.houseRent ? 'Paid from Cash ✓' : 'Given from Cash?'}</span>
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">৳</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={miscCosts.houseRent === 0 ? '' : miscCosts.houseRent}
+                      onChange={(e) => handleUpdateStandardFixedCost('houseRent', parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-full bg-white border border-slate-200 rounded-lg pl-6 pr-2.5 py-1.5 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between text-[10px]">
+                    <span className={miscCosts.paidFromCash?.houseRent ? "text-emerald-700 font-semibold" : "text-slate-400"}>
+                      {miscCosts.paidFromCash?.houseRent ? 'Deducted from cash in hand' : 'Not deducted from cash'}
+                    </span>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Other Miscellaneous (Taka)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={miscCosts.otherCosts === 0 ? '' : miscCosts.otherCosts}
-                    onChange={(e) => handleUpdateStandardFixedCost('otherCosts', parseFloat(e.target.value) || 0)}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-xs font-semibold text-gray-800 focus:bg-white focus:ring-1 focus:ring-blue-500"
-                  />
+                {/* 6. Other Miscellaneous */}
+                <div className={`p-3.5 rounded-xl border transition-all ${
+                  miscCosts.paidFromCash?.otherCosts
+                    ? 'bg-emerald-50/40 border-emerald-300 shadow-2xs' 
+                    : 'bg-white border-slate-200'
+                }`}>
+                  <div className="flex items-center justify-between mb-1.5 gap-2">
+                    <label className="text-xs font-bold text-slate-800">Other / Miscellaneous</label>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleStandardFixedPaidFromCash('otherCosts', !miscCosts.paidFromCash?.otherCosts)}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 cursor-pointer transition-colors shrink-0 ${
+                        miscCosts.paidFromCash?.otherCosts
+                          ? 'bg-emerald-600 text-white shadow-2xs'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                      title={miscCosts.paidFromCash?.otherCosts ? "Click to mark as unpaid from cash" : "Click to mark as paid from cash"}
+                    >
+                      <DollarSign className="w-2.5 h-2.5" />
+                      <span>{miscCosts.paidFromCash?.otherCosts ? 'Paid from Cash ✓' : 'Given from Cash?'}</span>
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">৳</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={miscCosts.otherCosts === 0 ? '' : miscCosts.otherCosts}
+                      onChange={(e) => handleUpdateStandardFixedCost('otherCosts', parseFloat(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-full bg-white border border-slate-200 rounded-lg pl-6 pr-2.5 py-1.5 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                    />
+                  </div>
+                  <div className="mt-1.5 flex items-center justify-between text-[10px]">
+                    <span className={miscCosts.paidFromCash?.otherCosts ? "text-emerald-700 font-semibold" : "text-slate-400"}>
+                      {miscCosts.paidFromCash?.otherCosts ? 'Deducted from cash in hand' : 'Not deducted from cash'}
+                    </span>
+                  </div>
                 </div>
 
               </div>
@@ -2559,18 +2855,40 @@ export default function ManagerDashboard({
                       {miscCosts.customBills.length} {miscCosts.customBills.length === 1 ? 'category' : 'categories'}
                     </span>
                   </h4>
+                  <span className="text-[11px] text-slate-500">
+                    {miscCosts.customBills.filter(b => b.paidFromCash).length} of {miscCosts.customBills.length} paid from cash
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {miscCosts.customBills.map((bill) => (
                     <div 
                       key={bill.id} 
-                      className="p-3 bg-slate-50/80 border border-slate-200 rounded-xl flex items-center justify-between gap-3 hover:border-slate-300 transition-colors"
+                      className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 transition-colors ${
+                        bill.paidFromCash 
+                          ? 'bg-emerald-50/40 border-emerald-300 shadow-2xs' 
+                          : 'bg-white border-slate-200'
+                      }`}
                     >
                       <div className="flex-1 min-w-0">
-                        <label className="block text-xs font-bold text-slate-800 truncate mb-1" title={bill.name}>
-                          {bill.name}
-                        </label>
+                        <div className="flex items-center justify-between mb-1.5 gap-2">
+                          <label className="block text-xs font-bold text-slate-800 truncate" title={bill.name}>
+                            {bill.name}
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleCustomBillPaidFromCash(bill.id, !bill.paidFromCash)}
+                            className={`text-[9.5px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 cursor-pointer transition-colors shrink-0 ${
+                              bill.paidFromCash
+                                ? 'bg-emerald-600 text-white shadow-2xs'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                            title={bill.paidFromCash ? "Click to mark as unpaid from cash" : "Click to mark as paid from cash"}
+                          >
+                            <DollarSign className="w-2.5 h-2.5" />
+                            <span>{bill.paidFromCash ? 'Paid from Cash ✓' : 'Given from Cash?'}</span>
+                          </button>
+                        </div>
                         <div className="relative">
                           <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">৳</span>
                           <input
@@ -2583,12 +2901,17 @@ export default function ManagerDashboard({
                             placeholder="0"
                           />
                         </div>
+                        <div className="mt-1 text-[9.5px]">
+                          <span className={bill.paidFromCash ? "text-emerald-700 font-semibold" : "text-slate-400"}>
+                            {bill.paidFromCash ? 'Deducted from cash in hand' : 'Not deducted from cash'}
+                          </span>
+                        </div>
                       </div>
 
                       <button
                         type="button"
                         onClick={() => handleDeleteCustomBill(bill.id)}
-                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer self-end mb-0.5"
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer self-center"
                         title={`Delete category: ${bill.name}`}
                       >
                         <Trash2 className="w-4 h-4" />
