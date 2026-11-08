@@ -746,6 +746,34 @@ export default function PrintablePdfReportModal({
                 </section>
               )}
 
+              {/* Master Statement Notice & Signatures */}
+              {(activePreviewTab === 'all' || activePreviewTab === 'master') && (
+                <div className="space-y-4 pt-3 border-t border-slate-200 print:break-inside-avoid">
+                  {customNotes && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-700">
+                      <span className="font-bold block text-[11px] text-slate-900 mb-0.5">Important Manager Notice:</span>
+                      <p className="leading-relaxed text-slate-600">{customNotes}</p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-end pt-6 text-xs text-slate-700">
+                    <div className="text-center w-48">
+                      <div className="border-t border-slate-400 pt-1 font-bold text-slate-900">
+                        {managerName} {managerPhone ? `(${managerPhone})` : ''}
+                      </div>
+                      <div className="text-[10px] text-slate-400">Mess Manager / Authorizer</div>
+                    </div>
+
+                    <div className="text-center w-48">
+                      <div className="border-t border-slate-400 pt-1 font-bold text-slate-900">
+                        Auditor / Representative
+                      </div>
+                      <div className="text-[10px] text-slate-400">Boarder Audit Committee</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* 5. INDIVIDUAL MEMBER INVOICE SLIPS (Strictly 4 Slips Per A4 Sheet in 2x2 Grid) */}
               {includeMemberSlips && (activePreviewTab === 'all' || activePreviewTab === 'slips') && (
                 <section ref={printableSlipsAreaRef} className="space-y-4 print:break-before-page">
@@ -910,32 +938,6 @@ export default function PrintablePdfReportModal({
                   </div>
                 </section>
               )}
-
-              {/* Notice & Signatures */}
-              <div className="space-y-6 pt-3 border-t border-slate-200 print:break-inside-avoid">
-                {customNotes && (
-                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-700">
-                    <span className="font-bold block text-[11px] text-slate-900 mb-0.5">Important Manager Notice:</span>
-                    <p className="leading-relaxed text-slate-600">{customNotes}</p>
-                  </div>
-                )}
-
-                <div className="flex justify-between items-end pt-8 text-xs text-slate-700">
-                  <div className="text-center w-48">
-                    <div className="border-t border-slate-400 pt-1 font-bold text-slate-900">
-                      {managerName} {managerPhone ? `(${managerPhone})` : ''}
-                    </div>
-                    <div className="text-[10px] text-slate-400">Mess Manager / Authorizer</div>
-                  </div>
-
-                  <div className="text-center w-48">
-                    <div className="border-t border-slate-400 pt-1 font-bold text-slate-900">
-                      Auditor / Representative
-                    </div>
-                    <div className="text-[10px] text-slate-400">Boarder Audit Committee</div>
-                  </div>
-                </div>
-              </div>
 
             </div>
 

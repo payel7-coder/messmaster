@@ -89,7 +89,7 @@ export default function MonthEndReport({
         {
           includeBazaarList: true,
           includeFixedCostsBreakdown: true,
-          includeMemberSlips: true,
+          includeMemberSlips: false,
         }
       );
       const cleanMessName = (settings.messName || 'Mess').replace(/[^a-zA-Z0-9]/g, '_');
