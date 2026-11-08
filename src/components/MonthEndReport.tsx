@@ -14,7 +14,8 @@ import {
   ChevronDown,
   ChevronUp,
   Calculator,
-  Lock
+  Lock,
+  Sparkles
 } from 'lucide-react';
 import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport } from '../types';
 import { formatReadableMonth } from '../utils';
@@ -54,6 +55,7 @@ export default function MonthEndReport({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [showMealSheetModal, setShowMealSheetModal] = useState(false);
+  const hasSpecialFeast = (report.totalSpecialMealCost || 0) > 0;
 
   // State for tracking which boarders' step-by-step calculations are expanded
   const [expandedBoarders, setExpandedBoarders] = useState<Record<string, boolean>>({});
@@ -299,7 +301,8 @@ export default function MonthEndReport({
                 <th className="p-3 text-center">Meals Logged</th>
                 <th className="p-3 text-right">Meal Cost (A)</th>
                 <th className="p-3 text-right">Fixed Bills (B)</th>
-                <th className="p-3 text-right">Total Charged (A+B)</th>
+                {hasSpecialFeast && <th className="p-3 text-right text-purple-700">Special Feast (C)</th>}
+                <th className="p-3 text-right">Total Charged {hasSpecialFeast ? '(A+B+C)' : '(A+B)'}</th>
                 <th className="p-3 text-right">Total Deposited</th>
                 <th className="p-3 text-right">Net Balance Status</th>
               </tr>
@@ -347,6 +350,15 @@ export default function MonthEndReport({
                       <td className="p-3 text-center font-semibold text-gray-700">{bSum.totalMeals}</td>
                       <td className="p-3 text-right font-mono text-gray-600">৳ {bSum.mealCost.toFixed(2)}</td>
                       <td className="p-3 text-right font-mono text-gray-600">৳ {bSum.fixedCostShare.toFixed(2)}</td>
+                      {hasSpecialFeast && (
+                        <td className="p-3 text-right font-mono font-medium text-purple-700">
+                          {(bSum.specialMealCost || 0) > 0 ? (
+                            <span>৳ {(bSum.specialMealCost || 0).toFixed(2)}</span>
+                          ) : (
+                            <span className="text-slate-300">৳ 0.00</span>
+                          )}
+                        </td>
+                      )}
                       <td className="p-3 text-right font-mono font-bold text-slate-800">৳ {bSum.totalCost.toFixed(2)}</td>
                       <td className="p-3 text-right font-mono font-bold text-blue-700">৳ {bSum.totalDeposit.toFixed(2)}</td>
                       <td className="p-3 text-right">
@@ -363,14 +375,14 @@ export default function MonthEndReport({
                     {/* EXPANDED DETAILED CALCULATION STEP BREAKDOWN */}
                     {isExpanded && (
                       <tr className="bg-slate-50/50 print:bg-white">
-                        <td colSpan={7} className="p-4 border-t border-b border-slate-100 print:border-slate-300">
+                        <td colSpan={hasSpecialFeast ? 8 : 7} className="p-4 border-t border-b border-slate-100 print:border-slate-300">
                           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3 print:border-slate-300 print:shadow-none">
                             <div className="flex items-center gap-1.5 text-slate-800 font-bold border-b border-slate-100 pb-2 text-[11px] print:text-black">
                               <Calculator className="w-4 h-4 text-blue-600 print:hidden" />
                               <span>Formula & Step-by-Step Audit for {bSum.boarderName}{(bDetails?.roomNo || bSum.roomNo) ? ` (${bDetails?.roomNo || bSum.roomNo})` : ''}</span>
                             </div>
                             
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                            <div className={`grid grid-cols-1 sm:grid-cols-2 ${hasSpecialFeast ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}>
                               
                               {/* Step 1 */}
                               <div className="space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-100 print:bg-white print:border-slate-300">
@@ -390,18 +402,38 @@ export default function MonthEndReport({
                                 </div>
                               </div>
 
-                              {/* Step 3 */}
+                              {/* Step 3: Special Feast (C) */}
+                              {hasSpecialFeast && (
+                                <div className="space-y-1 bg-purple-50/70 p-2.5 rounded-lg border border-purple-200 print:bg-white print:border-slate-300">
+                                  <div className="text-[9px] uppercase font-bold text-purple-700 flex items-center gap-1 print:text-gray-600">
+                                    <Sparkles className="w-3 h-3 text-purple-600 print:hidden" />
+                                    <span>Step 3: Special Feast (C)</span>
+                                  </div>
+                                  <div className="font-bold text-purple-950 text-[11px] print:text-black">
+                                    ৳ {(bSum.specialMealCost || 0).toFixed(2)}
+                                  </div>
+                                  <div className="text-[10px] text-purple-800 leading-normal">
+                                    <span>Distributed only among feast diners</span>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Step 3/4 */}
                               <div className="space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-100 print:bg-white print:border-slate-300">
-                                <div className="text-[9px] uppercase font-bold text-slate-400 print:text-gray-600">Step 3: Total Charged (A+B)</div>
+                                <div className="text-[9px] uppercase font-bold text-slate-400 print:text-gray-600">
+                                  {hasSpecialFeast ? 'Step 4: Total Charged' : 'Step 3: Total Charged (A+B)'}
+                                </div>
                                 <div className="font-bold text-slate-800 text-[11px] print:text-black">৳ {bSum.totalCost.toFixed(2)}</div>
                                 <div className="text-[10px] text-slate-500 leading-normal">
-                                  <span>Meals (৳{bSum.mealCost.toFixed(2)}) + Bills Share (৳{bSum.fixedCostShare.toFixed(2)})</span>
+                                  <span>Meals (৳{bSum.mealCost.toFixed(2)}) + Bills (৳{bSum.fixedCostShare.toFixed(2)}){hasSpecialFeast ? ` + Feast (৳${(bSum.specialMealCost || 0).toFixed(2)})` : ''}</span>
                                 </div>
                               </div>
 
-                              {/* Step 4 */}
+                              {/* Step 4/5 */}
                               <div className="space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-100 print:bg-white print:border-slate-300">
-                                <div className="text-[9px] uppercase font-bold text-slate-400 print:text-gray-600">Step 4: Net Balance</div>
+                                <div className="text-[9px] uppercase font-bold text-slate-400 print:text-gray-600">
+                                  {hasSpecialFeast ? 'Step 5: Net Balance' : 'Step 4: Net Balance'}
+                                </div>
                                 <div className={`font-bold text-[11px] ${bSum.balance >= 0 ? 'text-blue-700 print:text-black' : 'text-rose-700 print:text-black'}`}>
                                   ৳ {bSum.balance.toFixed(2)}
                                 </div>
@@ -435,17 +467,22 @@ export default function MonthEndReport({
                 <td className="p-3 text-right text-gray-800">
                   ৳ {(report.totalFixedCost).toLocaleString('en-IN')}
                 </td>
+                {hasSpecialFeast && (
+                  <td className="p-3 text-right text-purple-800 font-mono font-bold">
+                    ৳ {(report.totalSpecialMealCost || 0).toLocaleString('en-IN')}
+                  </td>
+                )}
                 <td className="p-3 text-right text-slate-900">
-                  ৳ {(report.totalBazaarCost + report.totalFixedCost).toLocaleString('en-IN')}
+                  ৳ {(report.totalBazaarCost + report.totalFixedCost + (report.totalSpecialMealCost || 0)).toLocaleString('en-IN')}
                 </td>
                 <td className="p-3 text-right text-blue-800">৳ {report.totalDeposits.toLocaleString('en-IN')}</td>
                 <td className="p-3 text-right">
                   <span className={`font-bold px-2 py-1 rounded ${
-                    report.totalDeposits - (report.totalBazaarCost + report.totalFixedCost) >= 0
+                    report.totalDeposits - (report.totalBazaarCost + report.totalFixedCost + (report.totalSpecialMealCost || 0)) >= 0
                       ? 'text-blue-800 bg-blue-50/60'
                       : 'text-rose-800 bg-rose-50/60'
                   }`}>
-                    ৳ {(report.totalDeposits - (report.totalBazaarCost + report.totalFixedCost)).toFixed(2)}
+                    ৳ {(report.totalDeposits - (report.totalBazaarCost + report.totalFixedCost + (report.totalSpecialMealCost || 0))).toFixed(2)}
                   </span>
                 </td>
               </tr>
@@ -457,9 +494,14 @@ export default function MonthEndReport({
         <div className="border-t border-gray-100 pt-4 mt-4 text-[10px] text-gray-400 space-y-1 print:hidden">
           <p><strong>Formula Guide:</strong></p>
           <ul className="list-disc pl-4 space-y-0.5">
-            <li>Meal Rate = Total Bazaar (৳{report.totalBazaarCost}) / Total Active Meals ({report.totalMeals}) = <strong>৳{report.mealRate.toFixed(4)}/meal</strong></li>
+            <li>Meal Rate = Total Regular Bazaar (৳{report.totalBazaarCost}) / Total Active Meals ({report.totalMeals}) = <strong>৳{report.mealRate.toFixed(4)}/meal</strong></li>
             <li>Fixed Bills Share = Total bills (৳{report.totalFixedCost}) / Active boarders ({boarders.filter(b => b.isActive).length}) = <strong>৳{report.boardersReport[0]?.fixedCostShare || 0} per member</strong></li>
-            <li>Net balance = Total Deposits - Total Charged (Meals Cost + Fixed Bills Share). Positive is receivable back, negative is due to pay.</li>
+            {hasSpecialFeast && (
+              <li className="text-purple-700 font-medium">
+                Special Feasts = ৳{(report.totalSpecialMealCost || 0).toLocaleString('en-IN')} distributed only among participating boarders (completely excluded from regular daily meal rate).
+              </li>
+            )}
+            <li>Net balance = Total Deposits - Total Charged (Meals Cost + Fixed Bills Share + Special Feast Share). Positive is receivable back, negative is due to pay.</li>
           </ul>
         </div>
       </div>

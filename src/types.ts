@@ -23,6 +23,21 @@ export interface DailyMealLog {
   updatedAt?: string; // ISO timestamp for audit log
 }
 
+export interface SpecialMeal {
+  id: string;
+  title: string; // e.g. "Last Day Month-End Feast", "Special Beef & Polao Dinner"
+  date: string; // YYYY-MM-DD
+  totalCost: number; // in Taka
+  description?: string; // items bought
+  spentById?: string; // boarder ID or "manager" who bought it
+  paidFromCash?: boolean; // Whether paid from mess cash in hand
+  participantIds: string[]; // List of boarder IDs who ate this special meal
+  costPerPerson: number; // totalCost / participantIds.length
+  customShares?: Record<string, number>; // optional custom amount per participant
+  bazaarCostId?: string; // optional linked BazaarCost id if logged through bazaar
+  createdAt?: string; // ISO timestamp
+}
+
 export interface BazaarCost {
   id: string;
   date: string; // YYYY-MM-DD
@@ -35,6 +50,8 @@ export interface BazaarCost {
   isDueSettled?: boolean; // Whether the due has been adjusted / cleared from cash
   settledDate?: string; // Date when due was adjusted to cash (YYYY-MM-DD)
   settledNote?: string; // Optional note regarding cash adjustment
+  isSpecialMeal?: boolean; // Whether this cost is for a special meal / feast (excluded from regular meal rate)
+  specialMealId?: string; // Linked special meal ID if applicable
 }
 
 export interface CustomFixedBill {
@@ -87,6 +104,7 @@ export interface MessSettings {
   registeredManagerEmails?: string[]; // Authorized manager emails eligible for Google SSO
   minBreakfastDays?: number; // Minimum breakfast days required per month (defaults to 16)
   breakfastFines?: BreakfastFineRecord[]; // History of applied breakfast shortfall meal fines
+  specialMeals?: SpecialMeal[]; // List of special meals/feasts distributed only among participants
 }
 
 export interface RegisteredManager {
@@ -104,6 +122,7 @@ export interface BoarderSummary {
   totalMeals: number;
   mealCost: number;
   fixedCostShare: number;
+  specialMealCost: number; // Share of special feast costs eaten by this boarder (excluded from regular meal rate)
   totalCost: number;
   totalDeposit: number;
   balance: number; // deposit - totalCost (positive is surplus, negative is due)
@@ -112,9 +131,11 @@ export interface BoarderSummary {
 export interface MonthReport {
   month: string;
   totalMeals: number;
-  totalBazaarCost: number;
-  mealRate: number;
+  totalBazaarCost: number; // regular bazaar cost only (used for meal rate)
+  totalSpecialMealCost?: number; // total special feast cost for the month
+  mealRate: number; // calculated from regular bazaar only
   totalFixedCost: number;
   totalDeposits: number;
   boardersReport: BoarderSummary[];
+  specialMeals?: SpecialMeal[];
 }

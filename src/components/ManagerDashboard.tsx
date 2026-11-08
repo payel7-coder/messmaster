@@ -30,13 +30,16 @@ import {
   Lock,
   Unlock,
   Target,
-  Coffee
+  Coffee,
+  UtensilsCrossed,
+  Sparkles
 } from 'lucide-react';
-import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, CustomFixedBill, StandardFixedBillKey } from '../types';
+import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, CustomFixedBill, StandardFixedBillKey, SpecialMeal } from '../types';
 import { getDatesInMonth, formatReadableDate, formatReadableMonth } from '../utils';
 import PrintablePdfReportModal from './PrintablePdfReportModal';
 import BoarderMealSheetModal from './BoarderMealSheetModal';
 import BreakfastAuditModal from './BreakfastAuditModal';
+import SpecialMealModal from './SpecialMealModal';
 import RecentActivitiesSection from './RecentActivitiesSection';
 import {
   syncBoarderToFirestore,
@@ -87,9 +90,19 @@ export default function ManagerDashboard({
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [showMealSheetModal, setShowMealSheetModal] = useState(false);
   const [showBreakfastAuditModal, setShowBreakfastAuditModal] = useState(false);
+  const [showSpecialMealModal, setShowSpecialMealModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
   const [dashboardPinInput, setDashboardPinInput] = useState(settings.managerPin || '1234');
   const [dashboardPinSuccess, setDashboardPinSuccess] = useState(false);
+
+  // Active month's special meals / feasts
+  const monthSpecialMeals = useMemo(() => {
+    return (settings.specialMeals || []).filter(sm => sm.date.startsWith(settings.currentMonth));
+  }, [settings.specialMeals, settings.currentMonth]);
+
+  const totalSpecialMealsCost = useMemo(() => {
+    return monthSpecialMeals.reduce((sum, sm) => sum + (sm.totalCost || 0), 0);
+  }, [monthSpecialMeals]);
 
   // Compute number of active boarders below minimum breakfast rule for current month
   const minBreakfastDays = settings.minBreakfastDays || 16;
@@ -903,7 +916,13 @@ export default function ManagerDashboard({
   );
 
   const totalFixedBillsPaidFromCash = standardFixedBillsPaidFromCash + customFixedBillsPaidFromCash;
-  const remainingCash = totalCashDeposited - totalBazaarCashPaid - totalFixedBillsPaidFromCash;
+
+  // Standalone special feast costs paid from cash that are not already in bazaar costs
+  const standaloneSpecialMealsPaidFromCash = monthSpecialMeals
+    .filter(sm => sm.paidFromCash && !sm.bazaarCostId)
+    .reduce((sum, sm) => sum + (sm.totalCost || 0), 0);
+
+  const remainingCash = totalCashDeposited - totalBazaarCashPaid - totalFixedBillsPaidFromCash - standaloneSpecialMealsPaidFromCash;
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -944,6 +963,21 @@ export default function ManagerDashboard({
           >
             <Plus className="w-3.5 h-3.5" />
             <span>+ Deposit</span>
+          </button>
+
+          <button
+            onClick={() => setShowSpecialMealModal(true)}
+            id="btn-manager-special-meal"
+            className="flex items-center justify-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs px-3.5 py-2.5 rounded-xl cursor-pointer transition-all shrink-0 shadow-2xs"
+            title="Manage Special Feast / Meal costs distributed strictly among participating boarders (excluded from regular meal rate)"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+            <span>Special Feast</span>
+            {monthSpecialMeals.length > 0 && (
+              <span className="bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                {monthSpecialMeals.length}
+              </span>
+            )}
           </button>
 
           <button
@@ -2037,6 +2071,38 @@ export default function ManagerDashboard({
               </div>
             </div>
             
+            {/* Month-End Special Meal Banner */}
+            {monthSpecialMeals.length > 0 ? (
+              <div className="mb-3 p-3 bg-purple-50/90 border border-purple-200/90 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 animate-fadeIn shrink-0">
+                <div className="flex items-start gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-800 flex items-center justify-center shrink-0 mt-0.5">
+                    <UtensilsCrossed className="w-4 h-4 text-purple-700" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-purple-950 uppercase tracking-wide flex items-center gap-1.5">
+                        Special Feasts (সমাপনী ফিস্ট)
+                      </span>
+                      <span className="text-[10px] font-bold bg-purple-200 text-purple-900 px-1.5 py-0.2 rounded-full font-mono">
+                        {monthSpecialMeals.length} Recorded
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-purple-800 mt-0.5 leading-snug">
+                      Total <strong className="font-mono text-purple-950 font-bold">৳ {totalSpecialMealsCost.toLocaleString('en-IN')}</strong> distributed strictly among participants. Excluded from general meal rate!
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowSpecialMealModal(true)}
+                  className="self-start sm:self-auto flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg cursor-pointer transition-colors shadow-2xs shrink-0"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Manage Feasts</span>
+                </button>
+              </div>
+            ) : null}
+
             {/* Outstanding Shop Dues Summary Banner */}
             {totalPendingBazaarDues > 0 && (
               <div className="mb-3 p-3.5 bg-amber-50/90 border border-amber-200/90 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fadeIn shrink-0">
@@ -2099,6 +2165,12 @@ export default function ManagerDashboard({
                       <div className="space-y-1 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="text-sm font-bold text-slate-900 font-mono">৳ {cost.amount.toLocaleString('en-IN')}</span>
+                          {cost.isSpecialMeal && (
+                            <span className="text-[10px] bg-purple-100 text-purple-900 border border-purple-300 px-2 py-0.5 rounded-md font-bold flex items-center gap-1 font-mono">
+                              <Sparkles className="w-3 h-3 text-purple-600" />
+                              স্পেশাল ফিস্ট (মিল রেট মুক্ত)
+                            </span>
+                          )}
                           {!isCurrentMonth && (
                             <span className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.2 rounded font-medium">
                               Other Month
@@ -3198,6 +3270,17 @@ export default function ManagerDashboard({
         setMealLogs={setMealLogs}
         settings={settings}
         setSettings={setSettings}
+      />
+
+      {/* Special Feast / Month-End Meal Modal */}
+      <SpecialMealModal
+        isOpen={showSpecialMealModal}
+        onClose={() => setShowSpecialMealModal(false)}
+        boarders={boarders}
+        settings={settings}
+        setSettings={setSettings}
+        bazaarCosts={bazaarCosts}
+        setBazaarCosts={setBazaarCosts}
       />
 
       {/* Quick Security PIN Modal */}

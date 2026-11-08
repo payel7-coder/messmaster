@@ -63,7 +63,9 @@ export default function PrintablePdfReportModal({
 
   const activeMonthStr = formatReadableMonth(report.month);
   const activeBoarders = boarders.filter(b => b.isActive);
-  const netMessBalance = report.totalDeposits - (report.totalBazaarCost + report.totalFixedCost);
+  const hasSpecialFeast = (report.totalSpecialMealCost || 0) > 0;
+  const grandTotalSpent = report.totalBazaarCost + report.totalFixedCost + (report.totalSpecialMealCost || 0);
+  const netMessBalance = report.totalDeposits - grandTotalSpent;
   const currentMonthBazaars = bazaarCosts.filter(b => b.date.startsWith(report.month));
 
   // High-Fidelity Pure Vector Full PDF Export (Direct Download)
@@ -139,6 +141,9 @@ export default function PrintablePdfReportModal({
     msg += `🛒 *Total Bazaar:* ৳${report.totalBazaarCost.toLocaleString('en-IN')}\n`;
     msg += `💰 *Meal Rate:* ৳${report.mealRate.toFixed(4)} / meal\n`;
     msg += `🏢 *Shared Fixed Bills:* ৳${report.totalFixedCost.toLocaleString('en-IN')} (৳${(report.boardersReport[0]?.fixedCostShare || 0).toFixed(2)}/member)\n`;
+    if (hasSpecialFeast) {
+      msg += `🎉 *Special Feasts:* ৳${(report.totalSpecialMealCost || 0).toLocaleString('en-IN')} (Shared among participants, excluded from meal rate)\n`;
+    }
     msg += `💵 *Total Deposits:* ৳${report.totalDeposits.toLocaleString('en-IN')}\n`;
     msg += `------------------------------------\n`;
     msg += `*Member Balance Summary:*\n`;
@@ -507,7 +512,8 @@ export default function PrintablePdfReportModal({
                           <th className="p-2.5 text-center">Meals</th>
                           <th className="p-2.5 text-right">Meal Cost (A)</th>
                           <th className="p-2.5 text-right">Bills Share (B)</th>
-                          <th className="p-2.5 text-right">Total Due (A+B)</th>
+                          {hasSpecialFeast && <th className="p-2.5 text-right text-purple-700">Feast (C)</th>}
+                          <th className="p-2.5 text-right">Total Due {hasSpecialFeast ? '(A+B+C)' : '(A+B)'}</th>
                           <th className="p-2.5 text-right">Deposited</th>
                           <th className="p-2.5 text-right">Closing Balance</th>
                           <th className="p-2.5 text-center w-24">Signature</th>
@@ -535,6 +541,11 @@ export default function PrintablePdfReportModal({
                               <td className="p-2.5 text-center font-semibold">{bSum.totalMeals}</td>
                               <td className="p-2.5 text-right font-mono text-slate-600">৳ {bSum.mealCost.toFixed(2)}</td>
                               <td className="p-2.5 text-right font-mono text-slate-600">৳ {bSum.fixedCostShare.toFixed(2)}</td>
+                              {hasSpecialFeast && (
+                                <td className="p-2.5 text-right font-mono text-purple-700 font-medium">
+                                  {(bSum.specialMealCost || 0) > 0 ? `৳ ${(bSum.specialMealCost || 0).toFixed(2)}` : '৳ 0.00'}
+                                </td>
+                              )}
                               <td className="p-2.5 text-right font-mono font-bold text-slate-900">৳ {bSum.totalCost.toFixed(2)}</td>
                               <td className="p-2.5 text-right font-mono font-bold text-blue-700">৳ {bSum.totalDeposit.toFixed(2)}</td>
                               <td className="p-2.5 text-right font-mono font-bold">
@@ -560,7 +571,12 @@ export default function PrintablePdfReportModal({
                           <td className="p-2.5 text-center text-slate-900">{report.totalMeals.toFixed(1)}</td>
                           <td className="p-2.5 text-right font-mono text-slate-900">৳ {report.totalBazaarCost.toLocaleString('en-IN')}</td>
                           <td className="p-2.5 text-right font-mono text-slate-900">৳ {report.totalFixedCost.toLocaleString('en-IN')}</td>
-                          <td className="p-2.5 text-right font-mono text-slate-900">৳ {(report.totalBazaarCost + report.totalFixedCost).toLocaleString('en-IN')}</td>
+                          {hasSpecialFeast && (
+                            <td className="p-2.5 text-right font-mono text-purple-800 font-bold">
+                              ৳ {(report.totalSpecialMealCost || 0).toLocaleString('en-IN')}
+                            </td>
+                          )}
+                          <td className="p-2.5 text-right font-mono text-slate-900">৳ {grandTotalSpent.toLocaleString('en-IN')}</td>
                           <td className="p-2.5 text-right font-mono text-blue-800">৳ {report.totalDeposits.toLocaleString('en-IN')}</td>
                           <td className="p-2.5 text-right font-mono">
                             <span className={netMessBalance >= 0 ? 'text-emerald-700' : 'text-rose-700'}>
@@ -820,8 +836,15 @@ export default function PrintablePdfReportModal({
                                   <span className="font-mono font-bold text-slate-900">৳ {bSum.fixedCostShare.toFixed(2)}</span>
                                 </div>
 
+                                {bSum.specialMealCost !== undefined && bSum.specialMealCost > 0 && (
+                                  <div className="flex justify-between items-center py-0.5 border-b border-purple-100 text-purple-900 bg-purple-50/50 px-1 rounded">
+                                    <span>3. Special Feast Share:</span>
+                                    <span className="font-mono font-bold text-purple-800">৳ {bSum.specialMealCost.toFixed(2)}</span>
+                                  </div>
+                                )}
+
                                 <div className="flex justify-between items-center py-1 font-bold text-slate-900 bg-slate-50 px-2 rounded">
-                                  <span>Total Charged (1 + 2):</span>
+                                  <span>Total Charged {bSum.specialMealCost ? '(1 + 2 + 3):' : '(1 + 2):'}</span>
                                   <span className="font-mono">৳ {bSum.totalCost.toFixed(2)}</span>
                                 </div>
 

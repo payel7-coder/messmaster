@@ -1,4 +1,4 @@
-import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, BoarderSummary } from './types';
+import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, BoarderSummary, SpecialMeal } from './types';
 
 /**
  * Checks if a YYYY-MM-DD date string belongs to the active YYYY-MM month.
@@ -9,6 +9,8 @@ export function isSameMonth(dateStr: string, activeMonth: string): boolean {
 
 /**
  * Calculates the complete financial and meal report for the mess for a specific month.
+ * Special feast / special meals are excluded from the regular daily meal rate, and their
+ * cost is distributed strictly among the participating members who ate that meal.
  */
 export function calculateReport(
   boarders: Boarder[],
@@ -16,15 +18,28 @@ export function calculateReport(
   mealLogs: DailyMealLog[],
   bazaarCosts: BazaarCost[],
   miscCosts: MiscellaneousCosts,
-  settings: MessSettings
+  settings: MessSettings,
+  specialMeals?: SpecialMeal[]
 ): MonthReport {
   const activeMonth = settings.currentMonth;
   const activeBoarders = boarders.filter(b => b.isActive);
   const activeBoarderIds = new Set(activeBoarders.map(b => b.id));
 
-  // 1. Filter and Sum Bazaar Costs
+  // Identify special meals active in this month
+  const monthSpecialMeals = (specialMeals || settings.specialMeals || []).filter(sm => isSameMonth(sm.date, activeMonth));
+  const specialBazaarIds = new Set(
+    monthSpecialMeals.map(sm => sm.bazaarCostId).filter(Boolean) as string[]
+  );
+
+  // 1. Filter and Sum Regular Bazaar Costs (Excluding Special Feast Meals)
   const filteredBazaar = bazaarCosts.filter(c => isSameMonth(c.date, activeMonth));
-  const totalBazaarCost = filteredBazaar.reduce((sum, item) => sum + item.amount, 0);
+  const regularBazaar = filteredBazaar.filter(c => !c.isSpecialMeal && !specialBazaarIds.has(c.id));
+  const totalBazaarCost = regularBazaar.reduce((sum, item) => sum + item.amount, 0);
+
+  // Total special meals / feast cost for the month
+  const totalSpecialMealCost = Number(
+    monthSpecialMeals.reduce((sum, sm) => sum + (sm.totalCost || 0), 0).toFixed(2)
+  );
 
   // 2. Filter and Sum Meals
   const filteredMeals = mealLogs.filter(log => isSameMonth(log.date, activeMonth));
@@ -51,7 +66,7 @@ export function calculateReport(
     });
   });
 
-  // 3. Calculate Meal Rate (Taka per meal)
+  // 3. Calculate Regular Meal Rate (Taka per meal) - strictly using regular bazaar costs
   const mealRate = totalMeals > 0 ? Number((totalBazaarCost / totalMeals).toFixed(4)) : 0;
 
   // 4. Calculate Shared Fixed Costs
@@ -87,15 +102,29 @@ export function calculateReport(
 
   const totalDeposits = filteredDeposits.reduce((sum, item) => sum + item.amount, 0);
 
-  // 6. Build Individual Summaries
+  // 6. Build Individual Summaries with Special Meal Distribution
   const boardersReport: BoarderSummary[] = boarders.map(b => {
     const isBoarderActive = b.isActive;
     const meals = boarderMealCounts[b.id] || 0;
     
-    // An inactive boarder might have meals logged or deposits made, but usually doesn't share fixed costs
+    // Regular meal cost
     const mealCost = isBoarderActive ? Number((meals * mealRate).toFixed(2)) : 0;
     const share = isBoarderActive ? fixedCostShare : 0;
-    const totalCost = Number((mealCost + share).toFixed(2));
+
+    // Distribute special meal costs ONLY among boarders who participated
+    let boarderSpecialMealShare = 0;
+    monthSpecialMeals.forEach(sm => {
+      if (sm.participantIds.includes(b.id)) {
+        const participantCount = sm.participantIds.length;
+        const individualShare = sm.customShares?.[b.id] !== undefined
+          ? sm.customShares[b.id]
+          : (participantCount > 0 ? (sm.totalCost / participantCount) : 0);
+        boarderSpecialMealShare += individualShare;
+      }
+    });
+
+    const specialMealCost = Number(boarderSpecialMealShare.toFixed(2));
+    const totalCost = Number((mealCost + share + specialMealCost).toFixed(2));
     const totalDep = boarderDeposits[b.id] || 0;
     const balance = Number((totalDep - totalCost).toFixed(2));
 
@@ -106,6 +135,7 @@ export function calculateReport(
       totalMeals: meals,
       mealCost,
       fixedCostShare: share,
+      specialMealCost,
       totalCost,
       totalDeposit: totalDep,
       balance,
@@ -116,10 +146,12 @@ export function calculateReport(
     month: activeMonth,
     totalMeals: Number(totalMeals.toFixed(1)),
     totalBazaarCost,
+    totalSpecialMealCost,
     mealRate,
     totalFixedCost,
     totalDeposits,
     boardersReport,
+    specialMeals: monthSpecialMeals,
   };
 }
 

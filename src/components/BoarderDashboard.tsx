@@ -19,7 +19,9 @@ import {
   X,
   CheckCircle2,
   Lock,
-  Coffee
+  Coffee,
+  Sparkles,
+  UtensilsCrossed
 } from 'lucide-react';
 import { Boarder, Deposit, DailyMealLog, MonthReport, BoarderSummary, MessSettings, BazaarCost, MiscellaneousCosts } from '../types';
 import { formatReadableDate, formatReadableMonth } from '../utils';
@@ -111,6 +113,7 @@ export default function BoarderDashboard({
   const myFineRecord = (settings?.breakfastFines || []).find(
     f => f.boarderId === boarder.id && f.month === report.month
   );
+  const hasSpecialMeal = (summary.specialMealCost || 0) > 0;
 
   return (
     <div className="space-y-6 animate-fadeIn text-slate-800">
@@ -206,7 +209,10 @@ export default function BoarderDashboard({
               ৳ {summary.totalCost.toLocaleString('en-IN')}
             </h3>
             <p className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-2">
-              <span>Meals: ৳{summary.mealCost} + Bills: ৳{summary.fixedCostShare}</span>
+              <span>
+                Meals: ৳{summary.mealCost} + Bills: ৳{summary.fixedCostShare}
+                {hasSpecialMeal && ` + Feast: ৳${(summary.specialMealCost || 0).toFixed(2)}`}
+              </span>
             </p>
           </div>
         </div>
@@ -344,7 +350,7 @@ export default function BoarderDashboard({
           This is the exact mathematical step-by-step breakdown of how your current dues and statement balances are calculated.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-1">
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${hasSpecialMeal ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-4 pt-1`}>
           {/* Step 1: Meal Cost (A) */}
           <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-2">
             <span className="text-[10px] uppercase font-bold text-slate-400">Step 1: Meals Expense (A)</span>
@@ -369,21 +375,42 @@ export default function BoarderDashboard({
             </div>
           </div>
 
-          {/* Step 3: Total Charged (A+B) */}
+          {/* Step 3: Special Feast Share (C) - Only shown if participated */}
+          {hasSpecialMeal && (
+            <div className="bg-purple-50/70 border border-purple-200 rounded-xl p-4 space-y-2">
+              <span className="text-[10px] uppercase font-bold text-purple-700 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-purple-600" />
+                Step 3: Special Feast (C)
+              </span>
+              <div className="text-xl font-bold text-purple-950">৳ {(summary.specialMealCost || 0).toFixed(2)}</div>
+              <p className="text-xs text-purple-800 leading-normal">
+                Your distributed share of month-end grand feast(s). Excluded from regular daily meal rate.
+              </p>
+              <div className="font-mono text-[11px] text-purple-600 border-t border-purple-200 pt-2">
+                Shared only among feast diners
+              </div>
+            </div>
+          )}
+
+          {/* Step 3/4: Total Charged */}
           <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-2">
-            <span className="text-[10px] uppercase font-bold text-slate-400">Step 3: Total Charged</span>
+            <span className="text-[10px] uppercase font-bold text-slate-400">
+              {hasSpecialMeal ? 'Step 4: Total Charged' : 'Step 3: Total Charged'}
+            </span>
             <div className="text-xl font-bold text-slate-900">৳ {summary.totalCost.toFixed(2)}</div>
             <p className="text-xs text-slate-500 leading-relaxed">
-              The summation of your individual meal expenses and your equal share of the fixed bills
+              The summation of your meal expenses, equal fixed bills share{hasSpecialMeal ? ', and feast share' : ''}
             </p>
             <div className="font-mono text-[11px] text-slate-400 border-t border-slate-200/60 pt-2">
-              Formula: ৳{summary.mealCost.toFixed(2)} + ৳{summary.fixedCostShare.toFixed(2)}
+              Formula: ৳{summary.mealCost.toFixed(2)} + ৳{summary.fixedCostShare.toFixed(2)}{hasSpecialMeal ? ` + ৳${(summary.specialMealCost || 0).toFixed(2)}` : ''}
             </div>
           </div>
 
-          {/* Step 4: Net Balance Closing */}
+          {/* Step 4/5: Net Balance Closing */}
           <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-2">
-            <span className="text-[10px] uppercase font-bold text-slate-400">Step 4: Net Statement</span>
+            <span className="text-[10px] uppercase font-bold text-slate-400">
+              {hasSpecialMeal ? 'Step 5: Net Statement' : 'Step 4: Net Statement'}
+            </span>
             <div className={`text-xl font-bold ${summary.balance >= 0 ? 'text-blue-700' : 'text-rose-700'}`}>
               {summary.balance >= 0 ? '+' : ''}৳ {summary.balance.toFixed(2)}
             </div>
@@ -469,6 +496,24 @@ export default function BoarderDashboard({
                   />
                 </div>
               </div>
+
+              {hasSpecialMeal && (
+                <div>
+                  <div className="flex justify-between text-xs text-slate-500 mb-1">
+                    <span className="flex items-center gap-1 text-purple-700 font-medium">
+                      <Sparkles className="w-3 h-3 text-purple-600" />
+                      Special Feast Share
+                    </span>
+                    <span className="font-semibold text-purple-800">৳{(summary.specialMealCost || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-1.5">
+                    <div 
+                      className="bg-purple-600 h-1.5 rounded-full" 
+                      style={{ width: `${summary.totalCost > 0 ? ((summary.specialMealCost || 0) / summary.totalCost) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             <p className="text-[10px] text-slate-400 mt-4 leading-relaxed">
               * Common bills include cooker rent, wifi, electricity, water, gas and house rents shared equally among all active members.
@@ -652,8 +697,20 @@ export default function BoarderDashboard({
                     </span>
                   </div>
 
+                  {hasSpecialMeal && (
+                    <div className="flex justify-between items-center py-1 border-b border-slate-100 text-purple-900 bg-purple-50/50 px-2 rounded">
+                      <span className="flex items-center gap-1.5 text-slate-700">
+                        <Sparkles className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                        <span>3. Special Feast Share (সমাপনী ফিস্ট - অংশগ্রহণকারী হিসেবে)</span>
+                      </span>
+                      <span className="font-mono font-bold text-purple-800">
+                        ৳ {(summary.specialMealCost || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex justify-between items-center py-1.5 border-b-2 border-slate-200 font-bold text-slate-900 bg-slate-50 px-2 rounded">
-                    <span>Total Charged for Month (1 + 2)</span>
+                    <span>Total Charged for Month {hasSpecialMeal ? '(1 + 2 + 3)' : '(1 + 2)'}</span>
                     <span className="font-mono text-sm">৳ {summary.totalCost.toFixed(2)}</span>
                   </div>
 

@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport } from '../types';
+import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, BoarderSummary } from '../types';
 import { formatReadableDate, formatReadableMonth } from '../utils';
 
 export interface PdfReportOptions {
@@ -76,16 +76,24 @@ export function generateMonthlyReportPdf(
   doc.text('1. EXECUTIVE FINANCIAL SUMMARY', 14, currentY);
   currentY += 4;
 
+  const hasSpecialFeast = (report.totalSpecialMealCost || 0) > 0;
+  const grandTotalSpent = report.totalBazaarCost + report.totalFixedCost + (report.totalSpecialMealCost || 0);
+
   const kpis = [
     { label: 'Total Meals Consumed', value: `${report.totalMeals.toFixed(1)} meals` },
     { label: 'Total Bazaar Spent', value: `Tk ${report.totalBazaarCost.toLocaleString('en-IN')}` },
     { label: 'Calculated Meal Rate', value: `Tk ${report.mealRate.toFixed(4)} / meal` },
     { label: 'Total Shared Fixed Bills', value: `Tk ${report.totalFixedCost.toLocaleString('en-IN')}` },
     { label: 'Fixed Share (Per Boarder)', value: `Tk ${report.boardersReport[0]?.fixedCostShare?.toFixed(2) || '0.00'}` },
-    { label: 'Total Cash Deposited', value: `Tk ${report.totalDeposits.toLocaleString('en-IN')}` },
   ];
 
-  const netBalance = report.totalDeposits - (report.totalBazaarCost + report.totalFixedCost);
+  if (hasSpecialFeast) {
+    kpis.push({ label: 'Special Feasts Total', value: `Tk ${(report.totalSpecialMealCost || 0).toLocaleString('en-IN')}` });
+  }
+
+  kpis.push({ label: 'Total Cash Deposited', value: `Tk ${report.totalDeposits.toLocaleString('en-IN')}` });
+
+  const netBalance = report.totalDeposits - grandTotalSpent;
   const netLabel = netBalance >= 0 ? 'Surplus Balance (Cash in Hand)' : 'Deficit / Shortfall';
   kpis.push({
     label: netLabel,
@@ -112,7 +120,7 @@ export function generateMonthlyReportPdf(
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
-    if (idx === 6) {
+    if (idx === kpis.length - 1) {
       if (netBalance >= 0) {
         doc.setTextColor(21, 128, 61); // Green
       } else {
@@ -140,6 +148,21 @@ export function generateMonthlyReportPdf(
     const balanceSign = bSum.balance >= 0 ? '+' : '';
     const statusNote = bSum.balance >= 0 ? 'Refund' : 'Due';
 
+    if (hasSpecialFeast) {
+      return [
+        (index + 1).toString(),
+        `${bSum.boarderName}${room}${status}`,
+        bSum.totalMeals.toString(),
+        `Tk ${bSum.mealCost.toFixed(2)}`,
+        `Tk ${bSum.fixedCostShare.toFixed(2)}`,
+        `Tk ${(bSum.specialMealCost || 0).toFixed(2)}`,
+        `Tk ${bSum.totalCost.toFixed(2)}`,
+        `Tk ${bSum.totalDeposit.toFixed(2)}`,
+        `${balanceSign}Tk ${bSum.balance.toFixed(2)} (${statusNote})`,
+        '', // Signature space
+      ];
+    }
+
     return [
       (index + 1).toString(),
       `${bSum.boarderName}${room}${status}`,
@@ -154,47 +177,75 @@ export function generateMonthlyReportPdf(
   });
 
   // Grand totals row
-  const totalDueRefund = report.totalDeposits - (report.totalBazaarCost + report.totalFixedCost);
-  const totalRow = [
+  const totalDueRefund = report.totalDeposits - grandTotalSpent;
+  const totalRow = hasSpecialFeast ? [
     '',
     'GRAND TOTALS',
     report.totalMeals.toString(),
     `Tk ${report.totalBazaarCost.toFixed(2)}`,
     `Tk ${report.totalFixedCost.toFixed(2)}`,
-    `Tk ${(report.totalBazaarCost + report.totalFixedCost).toFixed(2)}`,
+    `Tk ${(report.totalSpecialMealCost || 0).toFixed(2)}`,
+    `Tk ${grandTotalSpent.toFixed(2)}`,
+    `Tk ${report.totalDeposits.toFixed(2)}`,
+    `${totalDueRefund >= 0 ? '+' : ''}Tk ${totalDueRefund.toFixed(2)}`,
+    '',
+  ] : [
+    '',
+    'GRAND TOTALS',
+    report.totalMeals.toString(),
+    `Tk ${report.totalBazaarCost.toFixed(2)}`,
+    `Tk ${report.totalFixedCost.toFixed(2)}`,
+    `Tk ${grandTotalSpent.toFixed(2)}`,
     `Tk ${report.totalDeposits.toFixed(2)}`,
     `${totalDueRefund >= 0 ? '+' : ''}Tk ${totalDueRefund.toFixed(2)}`,
     '',
   ];
 
+  const tableHead = hasSpecialFeast 
+    ? [['#', 'Member Name', 'Meals', 'Meal (A)', 'Fixed (B)', 'Feast (C)', 'Charged', 'Deposit', 'Net Balance', 'Signature']]
+    : [['#', 'Member Name', 'Meals', 'Meal Cost (A)', 'Fixed Share (B)', 'Charged (A+B)', 'Deposit', 'Net Balance', 'Signature']];
+
+  const tableColStyles = hasSpecialFeast ? {
+    0: { cellWidth: 7, halign: 'center' as const },
+    1: { cellWidth: 35, fontStyle: 'bold' as const },
+    2: { cellWidth: 14, halign: 'center' as const },
+    3: { cellWidth: 19, halign: 'right' as const },
+    4: { cellWidth: 19, halign: 'right' as const },
+    5: { cellWidth: 18, halign: 'right' as const },
+    6: { cellWidth: 21, halign: 'right' as const, fontStyle: 'bold' as const },
+    7: { cellWidth: 20, halign: 'right' as const },
+    8: { cellWidth: 23, halign: 'right' as const, fontStyle: 'bold' as const },
+    9: { cellWidth: 14, halign: 'center' as const },
+  } : {
+    0: { cellWidth: 8, halign: 'center' as const },
+    1: { cellWidth: 38, fontStyle: 'bold' as const },
+    2: { cellWidth: 16, halign: 'center' as const },
+    3: { cellWidth: 22, halign: 'right' as const },
+    4: { cellWidth: 22, halign: 'right' as const },
+    5: { cellWidth: 24, halign: 'right' as const, fontStyle: 'bold' as const },
+    6: { cellWidth: 22, halign: 'right' as const },
+    7: { cellWidth: 26, halign: 'right' as const, fontStyle: 'bold' as const },
+    8: { cellWidth: 16, halign: 'center' as const },
+  };
+
+  const balanceColIdx = hasSpecialFeast ? 8 : 7;
+
   autoTable(doc, {
     startY: currentY,
-    head: [
-      ['#', 'Member Name', 'Meals', 'Meal Cost (A)', 'Fixed Share (B)', 'Charged (A+B)', 'Deposit', 'Net Balance', 'Signature'],
-    ],
+    head: tableHead,
     body: [...tableRows, totalRow],
     theme: 'grid',
     headStyles: {
       fillColor: [30, 41, 59],
       textColor: [255, 255, 255],
       fontStyle: 'bold',
-      fontSize: 7.5,
+      fontSize: 7.2,
       halign: 'center',
     },
-    columnStyles: {
-      0: { cellWidth: 8, halign: 'center' },
-      1: { cellWidth: 38, fontStyle: 'bold' },
-      2: { cellWidth: 16, halign: 'center' },
-      3: { cellWidth: 22, halign: 'right' },
-      4: { cellWidth: 22, halign: 'right' },
-      5: { cellWidth: 24, halign: 'right', fontStyle: 'bold' },
-      6: { cellWidth: 22, halign: 'right' },
-      7: { cellWidth: 26, halign: 'right', fontStyle: 'bold' },
-      8: { cellWidth: 16, halign: 'center' },
-    },
+    columnStyles: tableColStyles,
     styles: {
-      fontSize: 7.2,
-      cellPadding: 1.8,
+      fontSize: 7,
+      cellPadding: 1.6,
       textColor: [30, 41, 59],
     },
     didParseCell: (data) => {
@@ -204,7 +255,7 @@ export function generateMonthlyReportPdf(
         data.cell.styles.fillColor = [241, 245, 249];
       }
       // Balance column coloring
-      if (data.column.index === 7 && data.section === 'body') {
+      if (data.column.index === balanceColIdx && data.section === 'body') {
         const text = data.cell.text[0] || '';
         if (text.includes('Refund') || text.startsWith('+')) {
           data.cell.styles.textColor = [21, 128, 61]; // green
@@ -1240,16 +1291,16 @@ export function generatePersonalVoucherPdf(
   const pageHeight = doc.internal.pageSize.getHeight();
   const activeMonthStr = formatReadableMonth(report.month);
 
-  const summary = report.boardersReport.find(r => r.boarderId === boarder.id) || {
+  const summary: BoarderSummary = report.boardersReport.find(r => r.boarderId === boarder.id) || {
     boarderId: boarder.id,
     boarderName: boarder.name,
     totalMeals: 0,
     mealCost: 0,
     fixedCostShare: 0,
+    specialMealCost: 0,
     totalCost: 0,
     totalDeposit: 0,
     balance: 0,
-    status: 'Settled' as const,
   };
 
   const isSurplus = summary.balance >= 0;
@@ -1309,32 +1360,47 @@ export function generatePersonalVoucherPdf(
   curY += 12;
 
   // Financial Breakdown autoTable
+  const voucherBody: (string | number)[][] = [
+    [
+      'Total Meals Consumed',
+      `${summary.totalMeals.toFixed(1)} meals @ Tk ${report.mealRate.toFixed(4)}/meal`,
+      `Tk ${summary.mealCost.toFixed(2)}`,
+    ],
+    [
+      'Shared Utility & Fixed Costs Share',
+      'Equal division among active members',
+      `Tk ${summary.fixedCostShare.toFixed(2)}`,
+    ],
+  ];
+
+  if ((summary.specialMealCost || 0) > 0) {
+    voucherBody.push([
+      'Special Feast Share (C)',
+      'Month-end feast (excluded from regular daily meal rate)',
+      `Tk ${(summary.specialMealCost || 0).toFixed(2)}`,
+    ]);
+  }
+
+  voucherBody.push(
+    [
+      'Total Monthly Charges (A)',
+      (summary.specialMealCost || 0) > 0
+        ? 'Sum of Meals + Shared Bills + Special Feast'
+        : 'Sum of Meal Cost + Shared Fixed Overhead',
+      `Tk ${summary.totalCost.toFixed(2)}`,
+    ],
+    [
+      'Total Advance Deposits Paid (B)',
+      `${boarderDeposits.length} deposit entry(s) credited`,
+      `Tk ${summary.totalDeposit.toFixed(2)}`,
+    ]
+  );
+
   autoTable(doc, {
     startY: curY,
     margin: { left: 14, right: 14 },
     head: [['Description / Expense Category', 'Calculation Basis', 'Amount (Tk)']],
-    body: [
-      [
-        'Total Meals Consumed',
-        `${summary.totalMeals.toFixed(1)} meals @ Tk ${report.mealRate.toFixed(4)}/meal`,
-        `Tk ${summary.mealCost.toFixed(2)}`,
-      ],
-      [
-        'Shared Utility & Fixed Costs Share',
-        'Equal division among active members',
-        `Tk ${summary.fixedCostShare.toFixed(2)}`,
-      ],
-      [
-        'Total Monthly Charges (A)',
-        'Sum of Meal Cost + Shared Fixed Overhead',
-        `Tk ${summary.totalCost.toFixed(2)}`,
-      ],
-      [
-        'Total Advance Deposits Paid (B)',
-        `${boarderDeposits.length} deposit entry(s) credited`,
-        `Tk ${summary.totalDeposit.toFixed(2)}`,
-      ],
-    ],
+    body: voucherBody,
     foot: [
       [
         isSurplus ? 'Closing Refund / Credit (B - A)' : 'Net Amount Due to Pay (A - B)',
