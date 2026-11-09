@@ -15,7 +15,10 @@ import {
   ChevronUp,
   Calculator,
   Lock,
-  Sparkles
+  Sparkles,
+  ArrowRightLeft,
+  History,
+  CalendarCheck
 } from 'lucide-react';
 import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport } from '../types';
 import { formatReadableMonth } from '../utils';
@@ -36,6 +39,8 @@ interface MonthEndReportProps {
   onImportBackup: (importedState: any) => void;
   isManager?: boolean;
   onRequireManagerLogin?: () => void;
+  onOpenHandoverModal?: () => void;
+  onSelectMonth?: (month: string) => void;
 }
 
 export default function MonthEndReport({
@@ -51,6 +56,8 @@ export default function MonthEndReport({
   onImportBackup,
   isManager = false,
   onRequireManagerLogin,
+  onOpenHandoverModal,
+  onSelectMonth,
 }: MonthEndReportProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showPdfModal, setShowPdfModal] = useState(false);
@@ -177,6 +184,19 @@ export default function MonthEndReport({
           {/* ONLY MANAGERS CAN SEE MEAL SHEET PDF, MONTHLY AUDIT PDF, AND DIRECT PRINT OPTIONS */}
           {isManager ? (
             <>
+              {onOpenHandoverModal && (
+                <button
+                  type="button"
+                  onClick={onOpenHandoverModal}
+                  id="btn-close-month-handover"
+                  className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-all shadow-xs"
+                  title="Finalize monthly calculations, settle balances, and handover to new incoming manager"
+                >
+                  <ArrowRightLeft className="w-4 h-4 text-emerald-100" />
+                  <span>Close Month & Handover</span>
+                </button>
+              )}
+
               <button
                 onClick={() => setShowMealSheetModal(true)}
                 id="btn-generate-meal-sheet-modal"
@@ -605,6 +625,93 @@ export default function MonthEndReport({
         </div>
 
       </div>
+
+      {/* 5. Monthly Closure & Manager Handover Archive History */}
+      {settings.closureHistory && settings.closureHistory.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-3.5 print:hidden">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div>
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <History className="w-4 h-4 text-blue-600" />
+                <span>Monthly Closure & Manager Handover History</span>
+              </h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Archived records of finalized months, outgoing managers, and cash transitions.
+              </p>
+            </div>
+            <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">
+              {settings.closureHistory.length} Month{settings.closureHistory.length > 1 ? 's' : ''} Archived
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {settings.closureHistory.map((record) => {
+              const isCurrentViewed = record.month === report.month;
+              return (
+                <div 
+                  key={record.id} 
+                  className={`p-3.5 rounded-xl border transition-all ${
+                    isCurrentViewed 
+                      ? 'border-blue-400 bg-blue-50/40 shadow-xs' 
+                      : 'border-slate-200 bg-slate-50/50 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                      <CalendarCheck className="w-3.5 h-3.5 text-blue-600" />
+                      {formatReadableMonth(record.month)}
+                    </span>
+                    <span className="text-[9.5px] font-mono text-slate-400">
+                      {new Date(record.closedAt).toLocaleDateString()}
+                    </span>
+                  </div>
+
+                  <div className="mt-2 text-[11px] space-y-1 text-slate-600">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">Outgoing Manager:</span>
+                      <strong className="text-slate-800">{record.outgoingManagerName}</strong>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">Incoming Manager:</span>
+                      <strong className="text-emerald-700">{record.incomingManagerName}</strong>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">Final Meal Rate:</span>
+                      <strong className="text-blue-700 font-mono">৳ {record.mealRate.toFixed(4)}</strong>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">Cash Handed Over:</span>
+                      <strong className="text-slate-900 font-mono">৳ {record.cashHandoverAmount.toLocaleString('en-IN')}</strong>
+                    </div>
+                    <div className="flex justify-between items-center pt-0.5 border-t border-slate-200/60">
+                      <span className="text-slate-500">Settlement:</span>
+                      <span className="font-semibold text-[10px] text-slate-700">
+                        {record.balanceSettlementType === 'carried_forward' ? 'Carried to next month' : 'Cash Settled'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {record.handoverNotes && (
+                    <p className="mt-2 text-[10px] text-slate-500 bg-white p-2 rounded-lg border border-slate-200 italic">
+                      "{record.handoverNotes}"
+                    </p>
+                  )}
+
+                  {onSelectMonth && !isCurrentViewed && (
+                    <button
+                      type="button"
+                      onClick={() => onSelectMonth(record.month)}
+                      className="mt-2.5 w-full text-center py-1 rounded-lg text-[10.5px] font-bold text-blue-700 bg-white hover:bg-blue-50 border border-blue-200 transition-colors cursor-pointer"
+                    >
+                      View {formatReadableMonth(record.month)} Audit Sheet
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Printable PDF Report Modal - Manager Only */}
       {isManager && (

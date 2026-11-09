@@ -29,11 +29,12 @@ import {
   UploadCloud,
   UserCheck,
   UserPlus,
-  Users
+  Users,
+  ArrowRightLeft
 } from 'lucide-react';
 
-import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, RegisteredManager } from './types';
-import { calculateReport } from './utils';
+import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, RegisteredManager, MonthClosureRecord } from './types';
+import { calculateReport, formatReadableMonth } from './utils';
 import { INITIAL_SETTINGS, INITIAL_MISC_COSTS, generateSampleData } from './data';
 import { testFirestoreConnection, auth, signOutManager } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -41,6 +42,8 @@ import {
   loadInitialData, 
   subscribeToFirestoreUpdates, 
   syncSettingsToFirestore,
+  syncDepositToFirestore,
+  syncMiscCostsToFirestore,
   seedFirestore,
   clearBrowserLocalStorageCache,
   forceFetchFromServer,
@@ -60,6 +63,7 @@ import MonthEndReport from './components/MonthEndReport';
 import ManagerLoginModal from './components/ManagerLoginModal';
 import CloudSyncModal from './components/CloudSyncModal';
 import WipeDataModal from './components/WipeDataModal';
+import MonthCloseHandoverModal from './components/MonthCloseHandoverModal';
 
 type NavTab = 'dashboard' | 'report' | 'settings';
 
@@ -77,6 +81,7 @@ export default function App() {
   } | null>(null);
   const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
   const [showWipeModal, setShowWipeModal] = useState<boolean>(false);
+  const [showHandoverModal, setShowHandoverModal] = useState<boolean>(false);
 
   // --- Active Role / Selected Profiles ---
   // Defaults to public 'boarder' view unless manager has already logged in on this browser
@@ -673,6 +678,64 @@ export default function App() {
     });
   };
 
+  // --- Month Close & Handover Handler ---
+  const handleConfirmHandover = async (payload: {
+    closureRecord: MonthClosureRecord;
+    nextMonth: string;
+    newManagerName: string;
+    newManagerPhone?: string;
+    newManagerPin?: string;
+    carryForwardDeposits?: Deposit[];
+    updatedMiscCosts?: MiscellaneousCosts;
+  }) => {
+    const {
+      closureRecord,
+      nextMonth,
+      newManagerName,
+      newManagerPhone,
+      newManagerPin,
+      carryForwardDeposits,
+      updatedMiscCosts,
+    } = payload;
+
+    const currentHistory = settings.closureHistory || [];
+    const updatedHistory = [closureRecord, ...currentHistory.filter(h => h.month !== closureRecord.month)];
+
+    const updatedSettings: MessSettings = {
+      ...settings,
+      currentMonth: nextMonth,
+      currentManagerName: newManagerName,
+      currentManagerPhone: newManagerPhone || '',
+      managerPin: newManagerPin || settings.managerPin || '1234',
+      closureHistory: updatedHistory,
+    };
+
+    setSettings(updatedSettings);
+    localStorage.setItem('mess_settings', JSON.stringify(updatedSettings));
+    syncSettingsToFirestore(updatedSettings);
+
+    if (carryForwardDeposits && carryForwardDeposits.length > 0) {
+      const updatedDeposits = [...deposits, ...carryForwardDeposits];
+      setDeposits(updatedDeposits);
+      localStorage.setItem('mess_deposits', JSON.stringify(updatedDeposits));
+      for (const dep of carryForwardDeposits) {
+        syncDepositToFirestore(dep);
+      }
+    }
+
+    if (updatedMiscCosts) {
+      setMiscCosts(updatedMiscCosts);
+      localStorage.setItem('mess_miscCosts', JSON.stringify(updatedMiscCosts));
+      syncMiscCostsToFirestore(updatedMiscCosts);
+    }
+
+    setCloudToast({
+      message: `Month ${formatReadableMonth(closureRecord.month)} closed! Handed over to ${newManagerName} for ${formatReadableMonth(nextMonth)}.`,
+      type: 'success',
+    });
+    setTimeout(() => setCloudToast(null), 6000);
+  };
+
   // Check if there is active data logged for the active month
   const activeMonth = settings.currentMonth;
   const hasActiveMonthData = 
@@ -810,6 +873,7 @@ export default function App() {
                   settings={settings}
                   setSettings={setSettings}
                   report={report}
+                  onOpenHandoverModal={() => setShowHandoverModal(true)}
                 />
               ) : (
                 /* Interactive Professional Manager Authentication Portal */
@@ -933,6 +997,8 @@ export default function App() {
               onImportBackup={handleImportBackup}
               isManager={isManagerAuthenticated}
               onRequireManagerLogin={handleRequireManagerLogin}
+              onOpenHandoverModal={() => setShowHandoverModal(true)}
+              onSelectMonth={(m) => handleUpdateSettings({ currentMonth: m })}
             />
           )}
 
@@ -1098,6 +1164,35 @@ export default function App() {
                     <p className="text-[10px] text-gray-400 mt-1.5 leading-normal">
                       * Changing the month shifts the filter for all logs, ledger deposits, and meal records. Previous months' histories are preserved when switching back.
                     </p>
+                  </div>
+
+                  {/* Current Active Manager & Handover Section */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <UserCheck className="w-4 h-4 text-emerald-600" />
+                        <div>
+                          <span className="text-xs font-bold text-slate-800 block">
+                            Current Appointed Manager: {settings.currentManagerName || 'Mess Manager'}
+                          </span>
+                          <span className="text-[10px] text-slate-500">
+                            {settings.currentManagerPhone ? `Contact: ${settings.currentManagerPhone} • ` : ''}Month: {formatReadableMonth(settings.currentMonth)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {isManagerAuthenticated && (
+                        <button
+                          type="button"
+                          onClick={() => setShowHandoverModal(true)}
+                          id="btn-settings-handover-modal"
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors cursor-pointer flex items-center gap-1 shadow-2xs"
+                        >
+                          <ArrowRightLeft className="w-3.5 h-3.5" />
+                          <span>Close & Handover</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Monthly Budget Target */}
@@ -1531,6 +1626,17 @@ export default function App() {
         currentMonth={settings.currentMonth}
         settings={settings}
         onSuccess={handleWipeSuccess}
+      />
+
+      {/* Month Closing & Manager Handover Modal */}
+      <MonthCloseHandoverModal
+        isOpen={showHandoverModal}
+        onClose={() => setShowHandoverModal(false)}
+        report={report}
+        boarders={boarders}
+        settings={settings}
+        miscCosts={miscCosts}
+        onConfirmHandover={handleConfirmHandover}
       />
 
     </div>

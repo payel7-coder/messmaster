@@ -105,6 +105,30 @@ export interface MessSettings {
   minBreakfastDays?: number; // Minimum breakfast days required per month (defaults to 16)
   breakfastFines?: BreakfastFineRecord[]; // History of applied breakfast shortfall meal fines
   specialMeals?: SpecialMeal[]; // List of special meals/feasts distributed only among participants
+  currentManagerName?: string; // Name of the currently appointed manager
+  currentManagerPhone?: string; // Contact phone/bKash of the currently appointed manager
+  closureHistory?: MonthClosureRecord[]; // Archive of closed months and manager handover records
+}
+
+export interface MonthClosureRecord {
+  id: string; // e.g. "closure_2026-11"
+  month: string; // "2026-11"
+  closedAt: string; // ISO timestamp
+  outgoingManagerName: string;
+  outgoingManagerPhone?: string;
+  incomingManagerName: string;
+  incomingManagerPhone?: string;
+  incomingManagerBoarderId?: string;
+  totalMeals: number;
+  totalBazaarCost: number;
+  totalSpecialMealCost?: number;
+  mealRate: number;
+  totalFixedCost: number;
+  totalDeposits: number;
+  netMessBalance: number; // surplus (+) or deficit (-)
+  cashHandoverAmount: number; // actual cash handed over to incoming manager
+  balanceSettlementType: 'carried_forward' | 'cash_settled';
+  handoverNotes?: string;
 }
 
 export interface RegisteredManager {

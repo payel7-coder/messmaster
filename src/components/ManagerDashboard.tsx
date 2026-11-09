@@ -32,7 +32,8 @@ import {
   Target,
   Coffee,
   UtensilsCrossed,
-  Sparkles
+  Sparkles,
+  ArrowRightLeft
 } from 'lucide-react';
 import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, CustomFixedBill, StandardFixedBillKey, SpecialMeal } from '../types';
 import { getDatesInMonth, formatReadableDate, formatReadableMonth } from '../utils';
@@ -67,6 +68,7 @@ interface ManagerDashboardProps {
   settings: MessSettings;
   setSettings: React.Dispatch<React.SetStateAction<MessSettings>>;
   report: MonthReport;
+  onOpenHandoverModal?: () => void;
 }
 
 type TabType = 'meals' | 'bazaar' | 'deposits' | 'fixed' | 'boarders';
@@ -85,6 +87,7 @@ export default function ManagerDashboard({
   settings,
   setSettings,
   report,
+  onOpenHandoverModal,
 }: ManagerDashboardProps) {
   const [activeTab, setActiveTab] = useState<TabType>('meals');
   const [showPdfModal, setShowPdfModal] = useState(false);
@@ -979,6 +982,18 @@ export default function ManagerDashboard({
               </span>
             )}
           </button>
+
+          {onOpenHandoverModal && (
+            <button
+              onClick={onOpenHandoverModal}
+              id="btn-manager-handover"
+              className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs px-3.5 py-2.5 rounded-xl cursor-pointer transition-all shadow-xs shrink-0"
+              title="Close month, settle balances, and handover management to new manager"
+            >
+              <ArrowRightLeft className="w-4 h-4 text-emerald-100" />
+              <span>Close & Handover</span>
+            </button>
+          )}
 
           <button
             onClick={() => setShowMealSheetModal(true)}

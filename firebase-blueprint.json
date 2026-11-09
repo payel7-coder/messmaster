@@ -77,8 +77,11 @@
         "messName": { "type": "string" },
         "currentMonth": { "type": "string" },
         "managerPin": { "type": "string" },
+        "currentManagerName": { "type": "string" },
+        "currentManagerPhone": { "type": "string" },
         "monthlyBudgetTarget": { "type": "number" },
-        "registeredManagerEmails": { "type": "array" }
+        "registeredManagerEmails": { "type": "array" },
+        "closureHistory": { "type": "array" }
       },
       "required": ["messName", "currentMonth"]
     },
