@@ -221,10 +221,11 @@ export default function PrintablePdfReportModal({
               type="button"
               onClick={handleNativePrint}
               id="btn-modal-print-dialog"
-              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
-              title="Optional: Browser Print Preview (Ctrl+P)"
+              className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs px-3 py-2 rounded-xl transition-colors cursor-pointer border border-slate-700 shadow-xs"
+              title="Browser Print / Save to PDF (Native Vector rendering with full Bengali font support)"
             >
-              <Printer className="w-4 h-4" />
+              <Printer className="w-4 h-4 text-slate-300" />
+              <span className="hidden md:inline">Print / Save as PDF</span>
             </button>
 
             <button

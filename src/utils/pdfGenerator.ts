@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, BoarderSummary } from '../types';
 import { formatReadableDate, formatReadableMonth } from '../utils';
 import { NOTO_SANS_BENGALI_REGULAR, NOTO_SANS_BENGALI_BOLD } from './bengaliFontData';
+import { shapeBengaliText, shapeBengaliTableData } from './bengaliShaper';
 
 /**
  * Registers embedded Noto Sans Bengali TrueType fonts into jsPDF Virtual File System.
@@ -46,7 +47,7 @@ export function generateMonthlyReportPdf(
   const {
     includeBazaarList = true,
     includeFixedCostsBreakdown = true,
-    includeMemberSlips = false, // Default false for master statement to keep it clean and prevent trailing blank voucher pages
+    includeMemberSlips = false,
     customNotes = 'Please clear all dues before the 5th of the month. Keep payment transaction slip or cash receipt.',
     managerName = 'Mess Manager',
     managerPhone = '',
@@ -69,20 +70,20 @@ export function generateMonthlyReportPdf(
   doc.setTextColor(15, 23, 42);
   doc.setFont('NotoSansBengali', 'bold');
   doc.setFontSize(15);
-  doc.text((settings.messName || 'Mess').toUpperCase(), 14, 12);
+  doc.text(shapeBengaliText((settings.messName || 'Mess').toUpperCase()), 14, 12);
 
   // Subtitle
   doc.setFontSize(8);
   doc.setFont('NotoSansBengali', 'normal');
   doc.setTextColor(71, 85, 105);
-  doc.text(`MONTHLY AUDIT STATEMENT & MEAL EXPENSE REPORT - ${activeMonthStr.toUpperCase()}`, 14, 17);
+  doc.text(shapeBengaliText(`MONTHLY AUDIT STATEMENT & MEAL EXPENSE REPORT - ${activeMonthStr.toUpperCase()}`), 14, 17);
 
   // Generation timestamp on right
   const now = new Date();
   const generatedDateStr = `${now.toLocaleDateString('en-GB')} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   doc.setFontSize(7);
   doc.setTextColor(100, 116, 139);
-  doc.text(`Generated: ${generatedDateStr}`, pageWidth - 14, 17, { align: 'right' });
+  doc.text(shapeBengaliText(`Generated: ${generatedDateStr}`), pageWidth - 14, 17, { align: 'right' });
 
   // Divider line
   doc.setDrawColor(203, 213, 225);
@@ -95,31 +96,31 @@ export function generateMonthlyReportPdf(
   doc.setFontSize(9.5);
   doc.setFont('NotoSansBengali', 'bold');
   doc.setTextColor(15, 23, 42);
-  doc.text('1. EXECUTIVE FINANCIAL SUMMARY', 14, currentY);
+  doc.text(shapeBengaliText('1. EXECUTIVE FINANCIAL SUMMARY'), 14, currentY);
   currentY += 3.5;
 
   const hasSpecialFeast = (report.totalSpecialMealCost || 0) > 0;
   const grandTotalSpent = report.totalBazaarCost + report.totalFixedCost + (report.totalSpecialMealCost || 0);
 
   const kpis = [
-    { label: 'Total Meals Consumed', value: `${report.totalMeals.toFixed(1)} meals` },
-    { label: 'Total Bazaar Spent', value: `৳ ${report.totalBazaarCost.toLocaleString('en-IN')}` },
-    { label: 'Calculated Meal Rate', value: `৳ ${report.mealRate.toFixed(4)} / meal` },
-    { label: 'Total Shared Fixed Bills', value: `৳ ${report.totalFixedCost.toLocaleString('en-IN')}` },
-    { label: 'Fixed Share (Per Boarder)', value: `৳ ${report.boardersReport[0]?.fixedCostShare?.toFixed(2) || '0.00'}` },
+    { label: shapeBengaliText('Total Meals Consumed'), value: shapeBengaliText(`${report.totalMeals.toFixed(1)} meals`) },
+    { label: shapeBengaliText('Total Bazaar Spent'), value: shapeBengaliText(`৳ ${report.totalBazaarCost.toLocaleString('en-IN')}`) },
+    { label: shapeBengaliText('Calculated Meal Rate'), value: shapeBengaliText(`৳ ${report.mealRate.toFixed(4)} / meal`) },
+    { label: shapeBengaliText('Total Shared Fixed Bills'), value: shapeBengaliText(`৳ ${report.totalFixedCost.toLocaleString('en-IN')}`) },
+    { label: shapeBengaliText('Fixed Share (Per Boarder)'), value: shapeBengaliText(`৳ ${report.boardersReport[0]?.fixedCostShare?.toFixed(2) || '0.00'}`) },
   ];
 
   if (hasSpecialFeast) {
-    kpis.push({ label: 'Special Feasts Total', value: `৳ ${(report.totalSpecialMealCost || 0).toLocaleString('en-IN')}` });
+    kpis.push({ label: shapeBengaliText('Special Feasts Total'), value: shapeBengaliText(`৳ ${(report.totalSpecialMealCost || 0).toLocaleString('en-IN')}`) });
   }
 
-  kpis.push({ label: 'Total Cash Deposited', value: `৳ ${report.totalDeposits.toLocaleString('en-IN')}` });
+  kpis.push({ label: shapeBengaliText('Total Cash Deposited'), value: shapeBengaliText(`৳ ${report.totalDeposits.toLocaleString('en-IN')}`) });
 
   const netBalance = report.totalDeposits - grandTotalSpent;
   const netLabel = netBalance >= 0 ? 'Surplus Balance (Cash in Hand)' : 'Deficit / Shortfall';
   kpis.push({
-    label: netLabel,
-    value: `${netBalance >= 0 ? '+' : '-'}৳ ${Math.abs(netBalance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+    label: shapeBengaliText(netLabel),
+    value: shapeBengaliText(`${netBalance >= 0 ? '+' : '-'}৳ ${Math.abs(netBalance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`),
   });
 
   const cardWidth = (pageWidth - 28 - 6) / 3;
@@ -160,7 +161,7 @@ export function generateMonthlyReportPdf(
   doc.setFontSize(9.5);
   doc.setFont('NotoSansBengali', 'bold');
   doc.setTextColor(15, 23, 42);
-  doc.text('2. MASTER BOARDER BALANCE SHEET', 14, currentY);
+  doc.text(shapeBengaliText('2. MASTER BOARDER BALANCE SHEET'), 14, currentY);
   currentY += 2;
 
   const tableRows = report.boardersReport.map((bSum, index) => {
@@ -253,8 +254,8 @@ export function generateMonthlyReportPdf(
 
   autoTable(doc, {
     startY: currentY,
-    head: tableHead,
-    body: [...tableRows, totalRow],
+    head: shapeBengaliTableData(tableHead),
+    body: shapeBengaliTableData([...tableRows, totalRow]),
     theme: 'grid',
     styles: {
       font: 'NotoSansBengali',
@@ -303,7 +304,7 @@ export function generateMonthlyReportPdf(
     doc.setFontSize(9.5);
     doc.setFont('NotoSansBengali', 'bold');
     doc.setTextColor(15, 23, 42);
-    doc.text('3. SHARED FIXED BILLS ITEMIZED BREAKDOWN', 14, currentY);
+    doc.text(shapeBengaliText('3. SHARED FIXED BILLS ITEMIZED BREAKDOWN'), 14, currentY);
     currentY += 2;
 
     const fixedItems: string[][] = [
@@ -329,8 +330,8 @@ export function generateMonthlyReportPdf(
 
     autoTable(doc, {
       startY: currentY,
-      head: [['Expense Category', 'Total Amount', 'Distribution Rule']],
-      body: fixedItems,
+      head: shapeBengaliTableData([['Expense Category', 'Total Amount', 'Distribution Rule']]),
+      body: shapeBengaliTableData(fixedItems),
       theme: 'grid',
       styles: {
         font: 'NotoSansBengali',
@@ -379,12 +380,12 @@ export function generateMonthlyReportPdf(
     doc.setFont('NotoSansBengali', 'bold');
     doc.setFontSize(7.5);
     doc.setTextColor(15, 23, 42);
-    doc.text('Important Instructions / Notice from Manager:', 17, currentY + 4.5);
+    doc.text(shapeBengaliText('Important Instructions / Notice from Manager:'), 17, currentY + 4.5);
 
     doc.setFont('NotoSansBengali', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(71, 85, 105);
-    doc.text(customNotes, 17, currentY + 9, { maxWidth: pageWidth - 34 });
+    doc.text(shapeBengaliText(customNotes), 17, currentY + 9, { maxWidth: pageWidth - 34 });
 
     currentY += 19;
   }
@@ -405,22 +406,22 @@ export function generateMonthlyReportPdf(
   doc.setFontSize(7.5);
   doc.setFont('NotoSansBengali', 'bold');
   doc.setTextColor(30, 41, 59);
-  doc.text(`Manager: ${managerName}${managerPhone ? ` (${managerPhone})` : ''}`, 18, signY + 3.8);
+  doc.text(shapeBengaliText(`Manager: ${managerName}${managerPhone ? ` (${managerPhone})` : ''}`), 18, signY + 3.8);
   doc.setFont('NotoSansBengali', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(100, 116, 139);
-  doc.text('Authorized Signature & Date', 18, signY + 7);
+  doc.text(shapeBengaliText('Authorized Signature & Date'), 18, signY + 7);
 
   // Committee Member line
   doc.line(pageWidth - 75, signY, pageWidth - 18, signY);
   doc.setFont('NotoSansBengali', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(30, 41, 59);
-  doc.text('Audit / Committee Representative', pageWidth - 75, signY + 3.8);
+  doc.text(shapeBengaliText('Audit / Committee Representative'), pageWidth - 75, signY + 3.8);
   doc.setFont('NotoSansBengali', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(100, 116, 139);
-  doc.text('Signature & Verification', pageWidth - 75, signY + 7);
+  doc.text(shapeBengaliText('Signature & Verification'), pageWidth - 75, signY + 7);
 
   // Daily Bazaar Ledger (Page 2 / subsequent page)
   const currentMonthBazaars = bazaarCosts.filter(b => b.date.startsWith(report.month));
@@ -431,7 +432,7 @@ export function generateMonthlyReportPdf(
     doc.setFontSize(10);
     doc.setFont('NotoSansBengali', 'bold');
     doc.setTextColor(15, 23, 42);
-    doc.text(`4. DAILY BAZAAR & EXPENSE LOG - ${activeMonthStr.toUpperCase()}`, 14, currentY);
+    doc.text(shapeBengaliText(`4. DAILY BAZAAR & EXPENSE LOG - ${activeMonthStr.toUpperCase()}`), 14, currentY);
     currentY += 3.5;
 
     const bazaarRows = currentMonthBazaars
@@ -464,8 +465,8 @@ export function generateMonthlyReportPdf(
 
     autoTable(doc, {
       startY: currentY,
-      head: [['#', 'Date', 'Description / Items', 'Purchased By', 'Amount']],
-      body: bazaarRows,
+      head: shapeBengaliTableData([['#', 'Date', 'Description / Items', 'Purchased By', 'Amount']]),
+      body: shapeBengaliTableData(bazaarRows),
       theme: 'grid',
       styles: {
         font: 'NotoSansBengali',
@@ -507,11 +508,11 @@ export function generateMonthlyReportPdf(
     doc.setFontSize(10);
     doc.setFont('NotoSansBengali', 'bold');
     doc.setTextColor(15, 23, 42);
-    doc.text(`5. INDIVIDUAL MEMBER FINANCIAL VOUCHER SLIPS - ${activeMonthStr.toUpperCase()}`, 10, slipStartY);
+    doc.text(shapeBengaliText(`5. INDIVIDUAL MEMBER FINANCIAL VOUCHER SLIPS - ${activeMonthStr.toUpperCase()}`), 10, slipStartY);
     doc.setFontSize(6.8);
     doc.setFont('NotoSansBengali', 'normal');
     doc.setTextColor(100, 116, 139);
-    doc.text('Arranged strictly 4 vouchers per A4 sheet (2x2 grid). Cut along guidelines.', 10, slipStartY + 3.5);
+    doc.text(shapeBengaliText('Arranged strictly 4 vouchers per A4 sheet (2x2 grid). Cut along guidelines.'), 10, slipStartY + 3.5);
     slipStartY += 6.5;
 
     const slipsPerPage = 4;
@@ -520,8 +521,8 @@ export function generateMonthlyReportPdf(
     const topMargin = slipStartY;
     const colGap = 5;
     const rowGap = 5;
-    const slipWidth = (pageWidth - 2 * leftMargin - colGap) / colCount; // ~92.5mm
-    const slipHeight = 124; // 124mm fits cleanly in 2 rows on A4
+    const slipWidth = (pageWidth - 2 * leftMargin - colGap) / colCount;
+    const slipHeight = 124;
 
     report.boardersReport.forEach((bSum, index) => {
       const pageIndex = index % slipsPerPage;
@@ -556,17 +557,17 @@ export function generateMonthlyReportPdf(
       doc.setFont('NotoSansBengali', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(15, 23, 42);
-      doc.text((settings.messName || 'Mess').toUpperCase(), x + 3.5, y + 4.8);
+      doc.text(shapeBengaliText((settings.messName || 'Mess').toUpperCase()), x + 3.5, y + 4.8);
 
       doc.setFontSize(6.2);
       doc.setTextColor(30, 41, 59);
-      doc.text(`VOUCHER #${voucherNo}${roomStr ? ` | RM: ${roomStr}` : ''}`, x + slipWidth - 3.5, y + 4.8, { align: 'right' });
+      doc.text(shapeBengaliText(`VOUCHER #${voucherNo}${roomStr ? ` | RM: ${roomStr}` : ''}`), x + slipWidth - 3.5, y + 4.8, { align: 'right' });
 
       // Subtitle
       doc.setFont('NotoSansBengali', 'normal');
       doc.setFontSize(5.5);
       doc.setTextColor(71, 85, 105);
-      doc.text(`MEAL STATEMENT • ${activeMonthStr.toUpperCase()}`, x + 3.5, y + 9);
+      doc.text(shapeBengaliText(`MEAL STATEMENT • ${activeMonthStr.toUpperCase()}`), x + 3.5, y + 9);
 
       // Status Badge
       doc.setFillColor(isSurplus ? 220 : 254, isSurplus ? 252 : 226, isSurplus ? 231 : 226);
@@ -574,20 +575,20 @@ export function generateMonthlyReportPdf(
       doc.setFont('NotoSansBengali', 'bold');
       doc.setFontSize(5.2);
       doc.setTextColor(isSurplus ? 21 : 185, isSurplus ? 128 : 28, isSurplus ? 61 : 28);
-      doc.text(isSurplus ? 'REFUNDABLE / CREDIT' : 'OUTSTANDING DUE', x + slipWidth - 17.25, y + 10, { align: 'center' });
+      doc.text(shapeBengaliText(isSurplus ? 'REFUNDABLE / CREDIT' : 'OUTSTANDING DUE'), x + slipWidth - 17.25, y + 10, { align: 'center' });
 
       // Member Profile Info Strip
       let curY = y + 17.5;
       doc.setFont('NotoSansBengali', 'bold');
       doc.setFontSize(7.5);
       doc.setTextColor(15, 23, 42);
-      doc.text(`Member: ${bSum.boarderName}${roomStr ? ` [${roomStr}]` : ''}`, x + 3.5, curY);
+      doc.text(shapeBengaliText(`Member: ${bSum.boarderName}${roomStr ? ` [${roomStr}]` : ''}`), x + 3.5, curY);
 
       if (bDetails?.phone) {
         doc.setFont('NotoSansBengali', 'normal');
         doc.setFontSize(6.2);
         doc.setTextColor(100, 116, 139);
-        doc.text(`Ph: ${bDetails.phone}`, x + slipWidth - 3.5, curY, { align: 'right' });
+        doc.text(shapeBengaliText(`Ph: ${bDetails.phone}`), x + slipWidth - 3.5, curY, { align: 'right' });
       }
 
       // Breakdown Box Table
@@ -602,28 +603,28 @@ export function generateMonthlyReportPdf(
       doc.setFont('NotoSansBengali', 'normal');
       doc.setFontSize(6.5);
       doc.setTextColor(51, 65, 85);
-      doc.text(`1. Meals (${bSum.totalMeals} @ ৳ ${report.mealRate.toFixed(2)})`, x + 4.5, rowY);
+      doc.text(shapeBengaliText(`1. Meals (${bSum.totalMeals} @ ৳ ${report.mealRate.toFixed(2)})`), x + 4.5, rowY);
       doc.setFont('NotoSansBengali', 'bold');
       doc.setTextColor(15, 23, 42);
-      doc.text(`৳ ${bSum.mealCost.toFixed(2)}`, x + slipWidth - 4.5, rowY, { align: 'right' });
+      doc.text(shapeBengaliText(`৳ ${bSum.mealCost.toFixed(2)}`), x + slipWidth - 4.5, rowY, { align: 'right' });
 
       // Row 2: Fixed Common Bills
       rowY += 7.5;
       doc.setFont('NotoSansBengali', 'normal');
       doc.setTextColor(51, 65, 85);
-      doc.text(`2. Shared Fixed Overhead Share`, x + 4.5, rowY);
+      doc.text(shapeBengaliText(`2. Shared Fixed Overhead Share`), x + 4.5, rowY);
       doc.setFont('NotoSansBengali', 'bold');
       doc.setTextColor(15, 23, 42);
-      doc.text(`৳ ${bSum.fixedCostShare.toFixed(2)}`, x + slipWidth - 4.5, rowY, { align: 'right' });
+      doc.text(shapeBengaliText(`৳ ${bSum.fixedCostShare.toFixed(2)}`), x + slipWidth - 4.5, rowY, { align: 'right' });
 
       // Row 2.5: Special Feast (if applicable)
       if (bSpecialMeal > 0) {
         rowY += 7.5;
         doc.setFont('NotoSansBengali', 'normal');
         doc.setTextColor(126, 34, 206);
-        doc.text(`3. Special Feast Share`, x + 4.5, rowY);
+        doc.text(shapeBengaliText(`3. Special Feast Share`), x + 4.5, rowY);
         doc.setFont('NotoSansBengali', 'bold');
-        doc.text(`৳ ${bSpecialMeal.toFixed(2)}`, x + slipWidth - 4.5, rowY, { align: 'right' });
+        doc.text(shapeBengaliText(`৳ ${bSpecialMeal.toFixed(2)}`), x + slipWidth - 4.5, rowY, { align: 'right' });
       }
 
       // Row 3: Total Charged (Divider line)
@@ -635,16 +636,16 @@ export function generateMonthlyReportPdf(
       doc.setFont('NotoSansBengali', 'bold');
       doc.setFontSize(6.8);
       doc.setTextColor(15, 23, 42);
-      doc.text(bSpecialMeal > 0 ? 'Total Charged (1+2+3):' : 'Total Month Charged (1+2):', x + 4.5, rowY);
-      doc.text(`৳ ${bSum.totalCost.toFixed(2)}`, x + slipWidth - 4.5, rowY, { align: 'right' });
+      doc.text(shapeBengaliText(bSpecialMeal > 0 ? 'Total Charged (1+2+3):' : 'Total Month Charged (1+2):'), x + 4.5, rowY);
+      doc.text(shapeBengaliText(`৳ ${bSum.totalCost.toFixed(2)}`), x + slipWidth - 4.5, rowY, { align: 'right' });
 
       // Row 4: Total Deposits
       rowY += 7.5;
       doc.setFont('NotoSansBengali', 'normal');
       doc.setTextColor(29, 78, 216);
-      doc.text('Total Deposits Received:', x + 4.5, rowY);
+      doc.text(shapeBengaliText('Total Deposits Received:'), x + 4.5, rowY);
       doc.setFont('NotoSansBengali', 'bold');
-      doc.text(`৳ ${bSum.totalDeposit.toFixed(2)}`, x + slipWidth - 4.5, rowY, { align: 'right' });
+      doc.text(shapeBengaliText(`৳ ${bSum.totalDeposit.toFixed(2)}`), x + slipWidth - 4.5, rowY, { align: 'right' });
 
       // Net Closing Balance Banner
       curY += boxHeight + 2.5;
@@ -655,16 +656,16 @@ export function generateMonthlyReportPdf(
       doc.setFont('NotoSansBengali', 'bold');
       doc.setFontSize(6.8);
       doc.setTextColor(isSurplus ? 21 : 185, isSurplus ? 128 : 28, isSurplus ? 61 : 28);
-      doc.text(isSurplus ? 'Closing Refund (Credit):' : 'Net Amount Due (Payable):', x + 4.5, curY + 6.5);
+      doc.text(shapeBengaliText(isSurplus ? 'Closing Refund (Credit):' : 'Net Amount Due (Payable):'), x + 4.5, curY + 6.5);
       doc.setFontSize(8.2);
-      doc.text(`৳ ${Math.abs(bSum.balance).toFixed(2)}`, x + slipWidth - 4.5, curY + 7, { align: 'right' });
+      doc.text(shapeBengaliText(`৳ ${Math.abs(bSum.balance).toFixed(2)}`), x + slipWidth - 4.5, curY + 7, { align: 'right' });
 
       // Notes / Instructions line
       curY += 13.5;
       doc.setFont('NotoSansBengali', 'normal');
       doc.setFontSize(5);
       doc.setTextColor(100, 116, 139);
-      doc.text('Please verify meals with ledger. Clear dues promptly.', x + 3.5, curY);
+      doc.text(shapeBengaliText('Please verify meals with ledger. Clear dues promptly.'), x + 3.5, curY);
 
       // Dual Signatures
       curY += 8;
@@ -676,8 +677,8 @@ export function generateMonthlyReportPdf(
       doc.setFont('NotoSansBengali', 'normal');
       doc.setFontSize(5.2);
       doc.setTextColor(100, 116, 139);
-      doc.text('Boarder Signature', x + 18, curY + 3, { align: 'center' });
-      doc.text('Manager Seal & Sig', x + slipWidth - 18, curY + 3, { align: 'center' });
+      doc.text(shapeBengaliText('Boarder Signature'), x + 18, curY + 3, { align: 'center' });
+      doc.text(shapeBengaliText('Manager Seal & Sig'), x + slipWidth - 18, curY + 3, { align: 'center' });
 
       // Draw middle perforation guidelines on each page
       const isLastOnPage = pageIndex === slipsPerPage - 1 || index === report.boardersReport.length - 1;
@@ -695,7 +696,7 @@ export function generateMonthlyReportPdf(
         doc.setFont('NotoSansBengali', 'normal');
         doc.setFontSize(5.2);
         doc.setTextColor(148, 163, 184);
-        doc.text('✂ Cut Along Guidelines ✂', midX, midY - 0.6, { align: 'center' });
+        doc.text(shapeBengaliText('✂ Cut Along Guidelines ✂'), midX, midY - 0.6, { align: 'center' });
       }
     });
   }
@@ -708,7 +709,7 @@ export function generateMonthlyReportPdf(
     doc.setFontSize(6.5);
     doc.setTextColor(148, 163, 184);
     doc.text(
-      `${settings.messName || 'Mess'} • Monthly Audit Statement (${activeMonthStr}) • Page ${i} of ${totalPages}`,
+      shapeBengaliText(`${settings.messName || 'Mess'} • Monthly Audit Statement (${activeMonthStr}) • Page ${i} of ${totalPages}`),
       pageWidth / 2,
       pageHeight - 5,
       { align: 'center' }
@@ -797,20 +798,20 @@ export function generateBoardersMealSheetPdf(
   doc.setTextColor(15, 23, 42);
   doc.setFont('NotoSansBengali', 'bold');
   doc.setFontSize(14);
-  doc.text((settings.messName || 'Mess').toUpperCase(), 12, 10);
+  doc.text(shapeBengaliText((settings.messName || 'Mess').toUpperCase()), 12, 10);
 
   // Subtitle
   doc.setFontSize(8);
   doc.setFont('NotoSansBengali', 'normal');
   doc.setTextColor(71, 85, 105);
-  doc.text(`MONTHLY BOARDER MEAL ATTENDANCE & CONSUMPTION REGISTER - ${activeMonthStr.toUpperCase()}`, 12, 15.5);
+  doc.text(shapeBengaliText(`MONTHLY BOARDER MEAL ATTENDANCE & CONSUMPTION REGISTER - ${activeMonthStr.toUpperCase()}`), 12, 15.5);
 
   // Timestamp on right
   const now = new Date();
   const generatedDateStr = `${now.toLocaleDateString('en-GB')} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
   doc.setFontSize(7);
   doc.setTextColor(100, 116, 139);
-  doc.text(`Generated: ${generatedDateStr} | Month: ${settings.currentMonth}`, pageWidth - 12, 15.5, { align: 'right' });
+  doc.text(shapeBengaliText(`Generated: ${generatedDateStr} | Month: ${settings.currentMonth}`), pageWidth - 12, 15.5, { align: 'right' });
 
   // Divider line
   doc.setDrawColor(203, 213, 225);
@@ -822,10 +823,10 @@ export function generateBoardersMealSheetPdf(
   const statBoxWidth = 44;
   const statBoxHeight = 9.5;
   const stats = [
-    { label: 'Total Boarders', val: `${boardersToInclude.length} members` },
-    { label: 'Total Meals Consumed', val: `${grandTotalMeals.toFixed(1)} meals` },
-    { label: 'Calculated Meal Rate', val: mealRate > 0 ? `৳ ${mealRate.toFixed(4)}` : 'Pending' },
-    { label: 'Daily Average Meals', val: `${(grandTotalMeals / daysInMonth).toFixed(1)} / day` },
+    { label: shapeBengaliText('Total Boarders'), val: shapeBengaliText(`${boardersToInclude.length} members`) },
+    { label: shapeBengaliText('Total Meals Consumed'), val: shapeBengaliText(`${grandTotalMeals.toFixed(1)} meals`) },
+    { label: shapeBengaliText('Calculated Meal Rate'), val: shapeBengaliText(mealRate > 0 ? `৳ ${mealRate.toFixed(4)}` : 'Pending') },
+    { label: shapeBengaliText('Daily Average Meals'), val: shapeBengaliText(`${(grandTotalMeals / daysInMonth).toFixed(1)} / day`) },
   ];
 
   stats.forEach((s, i) => {
@@ -855,11 +856,11 @@ export function generateBoardersMealSheetPdf(
   doc.setFont('NotoSansBengali', 'bold');
   doc.setFontSize(6.2);
   doc.setTextColor(71, 85, 105);
-  doc.text('Key:', legendX + 2.5, currentY + 3.8);
+  doc.text(shapeBengaliText('Key:'), legendX + 2.5, currentY + 3.8);
   doc.setFont('NotoSansBengali', 'normal');
   doc.setFontSize(5.8);
   doc.setTextColor(100, 116, 139);
-  doc.text('1 = 1 Meal | 2 = 2 Meals | 2.5 = Full (0.5+1+1) | - = Off (0)', legendX + 2.5, currentY + 7.4);
+  doc.text(shapeBengaliText('1 = 1 Meal | 2 = 2 Meals | 2.5 = Full (0.5+1+1) | - = Off (0)'), legendX + 2.5, currentY + 7.4);
 
   currentY += statBoxHeight + 3.5;
 
@@ -947,8 +948,8 @@ export function generateBoardersMealSheetPdf(
 
   autoTable(doc, {
     startY: currentY,
-    head: [tableHeaders],
-    body: [...tableRows, footerRow],
+    head: shapeBengaliTableData([tableHeaders]),
+    body: shapeBengaliTableData([...tableRows, footerRow]),
     theme: 'grid',
     styles: {
       font: 'NotoSansBengali',
@@ -1009,7 +1010,7 @@ export function generateBoardersMealSheetPdf(
     doc.setFont('NotoSansBengali', 'bold');
     doc.setFontSize(6.2);
     doc.setTextColor(180, 83, 9);
-    doc.text(`Special Meal Context: ${notedDays.join('  •  ')}`, 12, currentY, { maxWidth: pageWidth - 24 });
+    doc.text(shapeBengaliText(`Special Meal Context: ${notedDays.join('  •  ')}`), 12, currentY, { maxWidth: pageWidth - 24 });
     currentY += 4.5;
   }
 
@@ -1017,11 +1018,10 @@ export function generateBoardersMealSheetPdf(
     doc.setFont('NotoSansBengali', 'normal');
     doc.setFontSize(6.2);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Note: ${customNotes}`, 12, currentY, { maxWidth: pageWidth - 24 });
+    doc.text(shapeBengaliText(`Note: ${customNotes}`), 12, currentY, { maxWidth: pageWidth - 24 });
     currentY += 6.5;
   }
 
-  // Position signatures naturally right below notes without forcing 100mm gap
   const signY = currentY + 8;
 
   doc.setDrawColor(148, 163, 184);
@@ -1032,22 +1032,22 @@ export function generateBoardersMealSheetPdf(
   doc.setFontSize(7.2);
   doc.setFont('NotoSansBengali', 'bold');
   doc.setTextColor(30, 41, 59);
-  doc.text(`Manager: ${managerName}${managerPhone ? ` (${managerPhone})` : ''}`, 16, signY + 3.5);
+  doc.text(shapeBengaliText(`Manager: ${managerName}${managerPhone ? ` (${managerPhone})` : ''}`), 16, signY + 3.5);
   doc.setFont('NotoSansBengali', 'normal');
   doc.setFontSize(5.8);
   doc.setTextColor(100, 116, 139);
-  doc.text('Authorized Signature & Seal', 16, signY + 6.8);
+  doc.text(shapeBengaliText('Authorized Signature & Seal'), 16, signY + 6.8);
 
   // Committee / Boarder rep line
   doc.line(pageWidth - 80, signY, pageWidth - 16, signY);
   doc.setFont('NotoSansBengali', 'bold');
   doc.setFontSize(7.2);
   doc.setTextColor(30, 41, 59);
-  doc.text('Audit Committee / Dining Secretary', pageWidth - 80, signY + 3.5);
+  doc.text(shapeBengaliText('Audit Committee / Dining Secretary'), pageWidth - 80, signY + 3.5);
   doc.setFont('NotoSansBengali', 'normal');
   doc.setFontSize(5.8);
   doc.setTextColor(100, 116, 139);
-  doc.text('Verification & Approval Signature', pageWidth - 80, signY + 6.8);
+  doc.text(shapeBengaliText('Verification & Approval Signature'), pageWidth - 80, signY + 6.8);
 
   // Footer page numbers
   const totalPages = doc.getNumberOfPages();
@@ -1057,7 +1057,7 @@ export function generateBoardersMealSheetPdf(
     doc.setFontSize(6.2);
     doc.setTextColor(148, 163, 184);
     doc.text(
-      `${settings.messName || 'Mess'} • Monthly Meal Register (${activeMonthStr}) • Page ${i} of ${totalPages}`,
+      shapeBengaliText(`${settings.messName || 'Mess'} • Monthly Meal Register (${activeMonthStr}) • Page ${i} of ${totalPages}`),
       pageWidth / 2,
       pageHeight - 4.5,
       { align: 'center' }
@@ -1107,8 +1107,8 @@ export function generateSlipsOnlyPdf(
   const topMargin = 8;
   const colGap = 5;
   const rowGap = 5;
-  const slipWidth = (pageWidth - 2 * leftMargin - colGap) / colCount; // ~93.5mm
-  const slipHeight = 125; // 8 + 125 + 5 + 125 + 8 = 271mm < 297mm A4 (clean 26mm margin, zero blank overflow)
+  const slipWidth = (pageWidth - 2 * leftMargin - colGap) / colCount;
+  const slipHeight = 125;
 
   report.boardersReport.forEach((bSum, index) => {
     const pageIndex = index % slipsPerPage;
@@ -1143,17 +1143,17 @@ export function generateSlipsOnlyPdf(
     doc.setFont('NotoSansBengali', 'bold');
     doc.setFontSize(8.2);
     doc.setTextColor(15, 23, 42);
-    doc.text((settings.messName || 'Mess').toUpperCase(), x + 3.5, y + 5);
+    doc.text(shapeBengaliText((settings.messName || 'Mess').toUpperCase()), x + 3.5, y + 5);
 
     doc.setFontSize(6.2);
     doc.setTextColor(30, 41, 59);
-    doc.text(`VOUCHER #${voucherNo}${roomStr ? ` | RM: ${roomStr}` : ''}`, x + slipWidth - 3.5, y + 5, { align: 'right' });
+    doc.text(shapeBengaliText(`VOUCHER #${voucherNo}${roomStr ? ` | RM: ${roomStr}` : ''}`), x + slipWidth - 3.5, y + 5, { align: 'right' });
 
     // Subtitle
     doc.setFont('NotoSansBengali', 'normal');
     doc.setFontSize(5.5);
     doc.setTextColor(71, 85, 105);
-    doc.text(`MEAL STATEMENT • ${activeMonthStr.toUpperCase()}`, x + 3.5, y + 9.5);
+    doc.text(shapeBengaliText(`MEAL STATEMENT • ${activeMonthStr.toUpperCase()}`), x + 3.5, y + 9.5);
 
     // Status Badge
     doc.setFillColor(isSurplus ? 220 : 254, isSurplus ? 252 : 226, isSurplus ? 231 : 226);
@@ -1161,20 +1161,20 @@ export function generateSlipsOnlyPdf(
     doc.setFont('NotoSansBengali', 'bold');
     doc.setFontSize(5.2);
     doc.setTextColor(isSurplus ? 21 : 185, isSurplus ? 128 : 28, isSurplus ? 61 : 28);
-    doc.text(isSurplus ? 'REFUNDABLE / CREDIT' : 'OUTSTANDING DUE', x + slipWidth - 17.25, y + 10.3, { align: 'center' });
+    doc.text(shapeBengaliText(isSurplus ? 'REFUNDABLE / CREDIT' : 'OUTSTANDING DUE'), x + slipWidth - 17.25, y + 10.3, { align: 'center' });
 
     // Member Profile Info Strip
     let curY = y + 18;
     doc.setFont('NotoSansBengali', 'bold');
     doc.setFontSize(7.8);
     doc.setTextColor(15, 23, 42);
-    doc.text(`Member: ${bSum.boarderName}${roomStr ? ` [${roomStr}]` : ''}`, x + 3.5, curY);
+    doc.text(shapeBengaliText(`Member: ${bSum.boarderName}${roomStr ? ` [${roomStr}]` : ''}`), x + 3.5, curY);
 
     if (bDetails?.phone) {
       doc.setFont('NotoSansBengali', 'normal');
       doc.setFontSize(6.2);
       doc.setTextColor(100, 116, 139);
-      doc.text(`Ph: ${bDetails.phone}`, x + slipWidth - 3.5, curY, { align: 'right' });
+      doc.text(shapeBengaliText(`Ph: ${bDetails.phone}`), x + slipWidth - 3.5, curY, { align: 'right' });
     }
 
     // Breakdown Box Table
@@ -1189,28 +1189,28 @@ export function generateSlipsOnlyPdf(
     doc.setFont('NotoSansBengali', 'normal');
     doc.setFontSize(6.5);
     doc.setTextColor(51, 65, 85);
-    doc.text(`1. Meals (${bSum.totalMeals} @ ৳ ${report.mealRate.toFixed(2)})`, x + 4.5, rowY);
+    doc.text(shapeBengaliText(`1. Meals (${bSum.totalMeals} @ ৳ ${report.mealRate.toFixed(2)})`), x + 4.5, rowY);
     doc.setFont('NotoSansBengali', 'bold');
     doc.setTextColor(15, 23, 42);
-    doc.text(`৳ ${bSum.mealCost.toFixed(2)}`, x + slipWidth - 4.5, rowY, { align: 'right' });
+    doc.text(shapeBengaliText(`৳ ${bSum.mealCost.toFixed(2)}`), x + slipWidth - 4.5, rowY, { align: 'right' });
 
     // Row 2: Fixed Common Bills
     rowY += 7.5;
     doc.setFont('NotoSansBengali', 'normal');
     doc.setTextColor(51, 65, 85);
-    doc.text(`2. Shared Fixed Overhead Share`, x + 4.5, rowY);
+    doc.text(shapeBengaliText(`2. Shared Fixed Overhead Share`), x + 4.5, rowY);
     doc.setFont('NotoSansBengali', 'bold');
     doc.setTextColor(15, 23, 42);
-    doc.text(`৳ ${bSum.fixedCostShare.toFixed(2)}`, x + slipWidth - 4.5, rowY, { align: 'right' });
+    doc.text(shapeBengaliText(`৳ ${bSum.fixedCostShare.toFixed(2)}`), x + slipWidth - 4.5, rowY, { align: 'right' });
 
     // Row 2.5: Special Feast (if applicable)
     if (bSpecialMeal > 0) {
       rowY += 7.5;
       doc.setFont('NotoSansBengali', 'normal');
       doc.setTextColor(126, 34, 206);
-      doc.text(`3. Special Feast Share`, x + 4.5, rowY);
+      doc.text(shapeBengaliText(`3. Special Feast Share`), x + 4.5, rowY);
       doc.setFont('NotoSansBengali', 'bold');
-      doc.text(`৳ ${bSpecialMeal.toFixed(2)}`, x + slipWidth - 4.5, rowY, { align: 'right' });
+      doc.text(shapeBengaliText(`৳ ${bSpecialMeal.toFixed(2)}`), x + slipWidth - 4.5, rowY, { align: 'right' });
     }
 
     // Row 3: Total Charged (Divider line)
@@ -1222,16 +1222,16 @@ export function generateSlipsOnlyPdf(
     doc.setFont('NotoSansBengali', 'bold');
     doc.setFontSize(6.8);
     doc.setTextColor(15, 23, 42);
-    doc.text(bSpecialMeal > 0 ? 'Total Charged (1+2+3):' : 'Total Month Charged (1+2):', x + 4.5, rowY);
-    doc.text(`৳ ${bSum.totalCost.toFixed(2)}`, x + slipWidth - 4.5, rowY, { align: 'right' });
+    doc.text(shapeBengaliText(bSpecialMeal > 0 ? 'Total Charged (1+2+3):' : 'Total Month Charged (1+2):'), x + 4.5, rowY);
+    doc.text(shapeBengaliText(`৳ ${bSum.totalCost.toFixed(2)}`), x + slipWidth - 4.5, rowY, { align: 'right' });
 
     // Row 4: Total Deposits
     rowY += 7.5;
     doc.setFont('NotoSansBengali', 'normal');
     doc.setTextColor(29, 78, 216);
-    doc.text('Total Deposits Received:', x + 4.5, rowY);
+    doc.text(shapeBengaliText('Total Deposits Received:'), x + 4.5, rowY);
     doc.setFont('NotoSansBengali', 'bold');
-    doc.text(`৳ ${bSum.totalDeposit.toFixed(2)}`, x + slipWidth - 4.5, rowY, { align: 'right' });
+    doc.text(shapeBengaliText(`৳ ${bSum.totalDeposit.toFixed(2)}`), x + slipWidth - 4.5, rowY, { align: 'right' });
 
     // Net Closing Balance Banner
     curY += boxHeight + 2.5;
@@ -1242,16 +1242,16 @@ export function generateSlipsOnlyPdf(
     doc.setFont('NotoSansBengali', 'bold');
     doc.setFontSize(6.8);
     doc.setTextColor(isSurplus ? 21 : 185, isSurplus ? 128 : 28, isSurplus ? 61 : 28);
-    doc.text(isSurplus ? 'Closing Refund (Credit):' : 'Net Amount Due (Payable):', x + 4.5, curY + 6.8);
+    doc.text(shapeBengaliText(isSurplus ? 'Closing Refund (Credit):' : 'Net Amount Due (Payable):'), x + 4.5, curY + 6.8);
     doc.setFontSize(8.5);
-    doc.text(`৳ ${Math.abs(bSum.balance).toFixed(2)}`, x + slipWidth - 4.5, curY + 7.2, { align: 'right' });
+    doc.text(shapeBengaliText(`৳ ${Math.abs(bSum.balance).toFixed(2)}`), x + slipWidth - 4.5, curY + 7.2, { align: 'right' });
 
     // Notes / Instructions line
     curY += 14;
     doc.setFont('NotoSansBengali', 'normal');
     doc.setFontSize(5.2);
     doc.setTextColor(100, 116, 139);
-    doc.text(customNotes, x + 3.5, curY);
+    doc.text(shapeBengaliText(customNotes || 'Please verify meals with ledger. Clear dues promptly.'), x + 3.5, curY);
 
     // Dual Signatures
     curY += 8.5;
@@ -1263,8 +1263,8 @@ export function generateSlipsOnlyPdf(
     doc.setFont('NotoSansBengali', 'normal');
     doc.setFontSize(5.4);
     doc.setTextColor(100, 116, 139);
-    doc.text('Boarder Signature', x + 18, curY + 3.2, { align: 'center' });
-    doc.text('Manager Seal & Sig', x + slipWidth - 18, curY + 3.2, { align: 'center' });
+    doc.text(shapeBengaliText('Boarder Signature'), x + 18, curY + 3.2, { align: 'center' });
+    doc.text(shapeBengaliText('Manager Seal & Sig'), x + slipWidth - 18, curY + 3.2, { align: 'center' });
 
     // Draw middle perforation guidelines on each page
     const isLastOnPage = pageIndex === slipsPerPage - 1 || index === report.boardersReport.length - 1;
@@ -1282,7 +1282,7 @@ export function generateSlipsOnlyPdf(
       doc.setFont('NotoSansBengali', 'normal');
       doc.setFontSize(5.2);
       doc.setTextColor(148, 163, 184);
-      doc.text('✂ Cut Along Guidelines ✂', midX, midY - 0.6, { align: 'center' });
+      doc.text(shapeBengaliText('✂ Cut Along Guidelines ✂'), midX, midY - 0.6, { align: 'center' });
     }
   });
 
@@ -1293,7 +1293,7 @@ export function generateSlipsOnlyPdf(
     doc.setFontSize(6.2);
     doc.setTextColor(148, 163, 184);
     doc.text(
-      `${settings.messName || 'Mess'} • Member Financial Vouchers (${activeMonthStr}) • Page ${i} of ${totalPages}`,
+      shapeBengaliText(`${settings.messName || 'Mess'} • Member Financial Vouchers (${activeMonthStr}) • Page ${i} of ${totalPages}`),
       pageWidth / 2,
       pageHeight - 4,
       { align: 'center' }
@@ -1368,33 +1368,33 @@ export function generatePersonalVoucherPdf(
   doc.setFont('NotoSansBengali', 'bold');
   doc.setFontSize(13);
   doc.setTextColor(15, 23, 42);
-  doc.text((settings.messName || 'Mess').toUpperCase(), 14, 17);
+  doc.text(shapeBengaliText((settings.messName || 'Mess').toUpperCase()), 14, 17);
 
   // Subtitle
   doc.setFont('NotoSansBengali', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(71, 85, 105);
-  doc.text(`OFFICIAL MEMBER EXPENSE & MEAL SLIP - ${activeMonthStr.toUpperCase()}`, 14, 23);
+  doc.text(shapeBengaliText(`OFFICIAL MEMBER EXPENSE & MEAL SLIP - ${activeMonthStr.toUpperCase()}`), 14, 23);
 
   // Timestamp
   const now = new Date();
   doc.setFontSize(6.8);
   doc.setTextColor(148, 163, 184);
-  doc.text(`Issued: ${now.toLocaleDateString('en-GB')}`, pageWidth - 14, 23, { align: 'right' });
+  doc.text(shapeBengaliText(`Issued: ${now.toLocaleDateString('en-GB')}`), pageWidth - 14, 23, { align: 'right' });
 
   // Member Information Card
   let curY = 36;
   doc.setFont('NotoSansBengali', 'bold');
   doc.setFontSize(10.5);
   doc.setTextColor(15, 23, 42);
-  doc.text(`Member: ${boarder.name}`, 14, curY);
+  doc.text(shapeBengaliText(`Member: ${boarder.name}`), 14, curY);
 
   doc.setFontSize(8);
   doc.setFont('NotoSansBengali', 'normal');
   doc.setTextColor(71, 85, 105);
   const roomInfo = boarder.roomNo ? `Room: ${boarder.roomNo}` : 'General';
   const phoneInfo = boarder.phone ? ` • Phone: ${boarder.phone}` : '';
-  doc.text(`${roomInfo}${phoneInfo} • Status: ${boarder.isActive ? 'Active' : 'Inactive'}`, 14, curY + 4.8);
+  doc.text(shapeBengaliText(`${roomInfo}${phoneInfo} • Status: ${boarder.isActive ? 'Active' : 'Inactive'}`), 14, curY + 4.8);
 
   // Status Badge
   doc.setFillColor(isSurplus ? 220 : 254, isSurplus ? 252 : 226, isSurplus ? 231 : 226);
@@ -1402,7 +1402,7 @@ export function generatePersonalVoucherPdf(
   doc.setFont('NotoSansBengali', 'bold');
   doc.setFontSize(7);
   doc.setTextColor(isSurplus ? 21 : 185, isSurplus ? 128 : 28, isSurplus ? 61 : 28);
-  doc.text(isSurplus ? 'CREDIT / REFUNDABLE' : 'OUTSTANDING DUE', pageWidth - 30, curY - 0.2, { align: 'center' });
+  doc.text(shapeBengaliText(isSurplus ? 'CREDIT / REFUNDABLE' : 'OUTSTANDING DUE'), pageWidth - 30, curY - 0.2, { align: 'center' });
 
   curY += 10.5;
 
@@ -1446,15 +1446,15 @@ export function generatePersonalVoucherPdf(
   autoTable(doc, {
     startY: curY,
     margin: { left: 14, right: 14 },
-    head: [['Description / Expense Category', 'Calculation Basis', 'Amount (৳)']],
-    body: voucherBody,
-    foot: [
+    head: shapeBengaliTableData([['Description / Expense Category', 'Calculation Basis', 'Amount (৳)']]),
+    body: shapeBengaliTableData(voucherBody),
+    foot: shapeBengaliTableData([
       [
         isSurplus ? 'Closing Refund / Credit (B - A)' : 'Net Amount Due to Pay (A - B)',
         isSurplus ? 'Excess deposit will be refunded or adjusted' : 'Please settle with mess manager',
         `${isSurplus ? '+' : '-'}৳ ${Math.abs(summary.balance).toFixed(2)}`,
       ],
-    ],
+    ]),
     theme: 'plain',
     styles: {
       font: 'NotoSansBengali',
@@ -1495,7 +1495,7 @@ export function generatePersonalVoucherPdf(
     doc.setFont('NotoSansBengali', 'bold');
     doc.setFontSize(7.2);
     doc.setTextColor(15, 23, 42);
-    doc.text('Deposit Payments Credited This Month:', 14, finalY);
+    doc.text(shapeBengaliText('Deposit Payments Credited This Month:'), 14, finalY);
     finalY += 2;
 
     const depRows = boarderDeposits.map(d => [
@@ -1507,8 +1507,8 @@ export function generatePersonalVoucherPdf(
     autoTable(doc, {
       startY: finalY,
       margin: { left: 14, right: 14 },
-      head: [['Date', 'Payment Note / Method', 'Amount (৳)']],
-      body: depRows,
+      head: shapeBengaliTableData([['Date', 'Payment Note / Method', 'Amount (৳)']]),
+      body: shapeBengaliTableData(depRows),
       theme: 'plain',
       styles: {
         font: 'NotoSansBengali',
@@ -1543,11 +1543,11 @@ export function generatePersonalVoucherPdf(
   doc.setFont('NotoSansBengali', 'normal');
   doc.setFontSize(6.2);
   doc.setTextColor(100, 116, 139);
-  doc.text(`Note: ${customNotes}`, 17, finalY + 4);
+  doc.text(shapeBengaliText(`Note: ${customNotes}`), 17, finalY + 4);
   if (managerPhone) {
-    doc.text(`Manager: ${managerName} • Contact: ${managerPhone}`, 17, finalY + 7.8);
+    doc.text(shapeBengaliText(`Manager: ${managerName} • Contact: ${managerPhone}`), 17, finalY + 7.8);
   } else {
-    doc.text(`Manager: ${managerName} • Generated via MessMaster Portal`, 17, finalY + 7.8);
+    doc.text(shapeBengaliText(`Manager: ${managerName} • Generated via MessMaster Portal`), 17, finalY + 7.8);
   }
 
   // Signatures at bottom
@@ -1560,8 +1560,8 @@ export function generatePersonalVoucherPdf(
   doc.setFont('NotoSansBengali', 'normal');
   doc.setFontSize(6.5);
   doc.setTextColor(100, 116, 139);
-  doc.text('Boarder Signature', 36.5, sigY + 3.6, { align: 'center' });
-  doc.text('Manager Signature & Seal', pageWidth - 36.5, sigY + 3.6, { align: 'center' });
+  doc.text(shapeBengaliText('Boarder Signature'), 36.5, sigY + 3.6, { align: 'center' });
+  doc.text(shapeBengaliText('Manager Signature & Seal'), pageWidth - 36.5, sigY + 3.6, { align: 'center' });
 
   return doc;
 }
