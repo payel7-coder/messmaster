@@ -33,6 +33,7 @@ import {
   Coffee,
   UtensilsCrossed,
   Sparkles,
+  BarChart3,
   ArrowRightLeft
 } from 'lucide-react';
 import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, CustomFixedBill, StandardFixedBillKey, SpecialMeal } from '../types';
@@ -42,6 +43,7 @@ import BoarderMealSheetModal from './BoarderMealSheetModal';
 import BreakfastAuditModal from './BreakfastAuditModal';
 import SpecialMealModal from './SpecialMealModal';
 import RecentActivitiesSection from './RecentActivitiesSection';
+import ManagerAnalyticsDashboard from './ManagerAnalyticsDashboard';
 import {
   syncBoarderToFirestore,
   deleteBoarderFromFirestore,
@@ -68,10 +70,11 @@ interface ManagerDashboardProps {
   settings: MessSettings;
   setSettings: React.Dispatch<React.SetStateAction<MessSettings>>;
   report: MonthReport;
+  initialTab?: TabType;
   onOpenHandoverModal?: () => void;
 }
 
-type TabType = 'meals' | 'bazaar' | 'deposits' | 'fixed' | 'boarders';
+type TabType = 'analytics' | 'meals' | 'bazaar' | 'deposits' | 'fixed' | 'boarders';
 
 export default function ManagerDashboard({
   boarders,
@@ -87,9 +90,10 @@ export default function ManagerDashboard({
   settings,
   setSettings,
   report,
+  initialTab = 'meals',
   onOpenHandoverModal,
 }: ManagerDashboardProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('meals');
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [showMealSheetModal, setShowMealSheetModal] = useState(false);
   const [showBreakfastAuditModal, setShowBreakfastAuditModal] = useState(false);
@@ -996,6 +1000,20 @@ export default function ManagerDashboard({
           )}
 
           <button
+            onClick={() => setActiveTab('analytics')}
+            id="btn-manager-quick-analytics"
+            className={`flex items-center justify-center gap-2 font-bold text-xs px-3.5 py-2.5 rounded-xl cursor-pointer transition-all shadow-xs hover:shadow-md shrink-0 ${
+              activeTab === 'analytics'
+                ? 'bg-blue-600 text-white shadow-blue-200'
+                : 'bg-slate-800 hover:bg-slate-900 text-white'
+            }`}
+            title="Open Executive Analytics & Intelligence Dashboard"
+          >
+            <BarChart3 className="w-4 h-4 text-indigo-300" />
+            <span>Analytics</span>
+          </button>
+
+          <button
             onClick={() => setShowMealSheetModal(true)}
             id="btn-manager-meal-sheet-pdf"
             className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl cursor-pointer transition-all shadow-xs hover:shadow-md shrink-0"
@@ -1284,6 +1302,19 @@ export default function ManagerDashboard({
         <nav className="flex flex-wrap items-center -mb-px gap-2">
           
           <button
+            onClick={() => setActiveTab('analytics')}
+            id="tab-analytics"
+            className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-xs sm:text-sm cursor-pointer transition-colors ${
+              activeTab === 'analytics'
+                ? 'border-blue-600 text-blue-600 font-bold'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4 text-indigo-600" />
+            <span>Analytics & Trends</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('meals')}
             id="tab-meals"
             className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-xs sm:text-sm cursor-pointer transition-colors ${
@@ -1377,6 +1408,23 @@ export default function ManagerDashboard({
 
         </nav>
       </div>
+
+      {/* --- TAB 0: ANALYTICS DASHBOARD --- */}
+      {activeTab === 'analytics' && (
+        <ManagerAnalyticsDashboard
+          boarders={boarders}
+          deposits={deposits}
+          mealLogs={mealLogs}
+          bazaarCosts={bazaarCosts}
+          miscCosts={miscCosts}
+          settings={settings}
+          report={report}
+          onNavigateToTab={(tab) => setActiveTab(tab)}
+          onOpenBreakfastModal={() => setShowBreakfastAuditModal(true)}
+          onOpenSpecialMealModal={() => setShowSpecialMealModal(true)}
+          onOpenReportModal={() => setShowPdfModal(true)}
+        />
+      )}
 
       {/* --- TAB 1: MEALS LOGGER --- */}
       {activeTab === 'meals' && (

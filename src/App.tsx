@@ -30,7 +30,8 @@ import {
   UserCheck,
   UserPlus,
   Users,
-  ArrowRightLeft
+  ArrowRightLeft,
+  BarChart3
 } from 'lucide-react';
 
 import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, RegisteredManager, MonthClosureRecord } from './types';
@@ -60,12 +61,13 @@ import RoleSelector from './components/RoleSelector';
 import BoarderDashboard from './components/BoarderDashboard';
 import ManagerDashboard from './components/ManagerDashboard';
 import MonthEndReport from './components/MonthEndReport';
+import ManagerAnalyticsDashboard from './components/ManagerAnalyticsDashboard';
 import ManagerLoginModal from './components/ManagerLoginModal';
 import CloudSyncModal from './components/CloudSyncModal';
 import WipeDataModal from './components/WipeDataModal';
 import MonthCloseHandoverModal from './components/MonthCloseHandoverModal';
 
-type NavTab = 'dashboard' | 'report' | 'settings';
+type NavTab = 'dashboard' | 'analytics' | 'report' | 'settings';
 
 export default function App() {
   // --- Manager Authentication State ---
@@ -444,9 +446,9 @@ export default function App() {
     }
   }, [boarders, selectedBoarderId]);
 
-  // Privacy Guard: Prevent boarders from accessing Month-End Bills & Memos tab
+  // Privacy Guard: Prevent boarders from accessing Month-End Bills & Memos tab or Analytics
   useEffect(() => {
-    if (role === 'boarder' && activeTab === 'report') {
+    if (role === 'boarder' && (activeTab === 'report' || activeTab === 'analytics')) {
       setActiveTab('dashboard');
     }
   }, [role, activeTab]);
@@ -511,7 +513,7 @@ export default function App() {
       }
     } else {
       setRole('boarder');
-      if (activeTab === 'report') {
+      if (activeTab === 'report' || activeTab === 'analytics') {
         setActiveTab('dashboard');
       }
     }
@@ -787,6 +789,22 @@ export default function App() {
               {role === 'manager' ? 'Manager Console' : 'My Dashboard (Public)'}
             </button>
             
+            {/* Analytics & Trends is strictly for Manager Mode */}
+            {role === 'manager' && (
+              <button
+                onClick={() => setActiveTab('analytics')}
+                id="nav-tab-analytics"
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                  activeTab === 'analytics'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4 text-blue-600" />
+                Analytics & Trends
+              </button>
+            )}
+
             {/* Month-End Bills & Memos is strictly restricted to Manager Mode */}
             {role === 'manager' && (
               <button
@@ -979,6 +997,37 @@ export default function App() {
                   </button>
                 </div>
               )
+            )
+          )}
+
+          {/* SCREEN: ANALYTICS & TRENDS - Strictly Manager Mode */}
+          {activeTab === 'analytics' && role === 'manager' && (
+            isManagerAuthenticated ? (
+              <ManagerAnalyticsDashboard
+                boarders={boarders}
+                deposits={deposits}
+                mealLogs={mealLogs}
+                bazaarCosts={bazaarCosts}
+                miscCosts={miscCosts}
+                settings={settings}
+                report={report}
+                onNavigateToTab={(tab) => {
+                  setActiveTab('dashboard');
+                }}
+                onOpenReportModal={() => setActiveTab('report')}
+              />
+            ) : (
+              <div className="bg-white border border-slate-200 rounded-2xl max-w-xl mx-auto overflow-hidden shadow-sm animate-fadeIn p-8 text-center">
+                <Lock className="w-8 h-8 text-slate-400 mx-auto mb-2" />
+                <h3 className="text-base font-bold text-slate-900">Manager Authentication Required</h3>
+                <p className="text-xs text-slate-500 mt-1 mb-4">Please log in as a manager to view mess operational analytics.</p>
+                <button
+                  onClick={() => setShowLoginModal(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl cursor-pointer"
+                >
+                  Unlock Manager Portal
+                </button>
+              </div>
             )
           )}
 
