@@ -19,8 +19,8 @@ import {
   ArrowUpRight, 
   ArrowDownRight, 
   ShieldAlert, 
+  ShieldCheck,
   Coffee, 
-  Sparkles, 
   Building2, 
   Receipt, 
   Info,
@@ -232,9 +232,9 @@ export default function ManagerAnalyticsDashboard({
     }, 0);
   }, [currentMonthBazaars]);
 
-  // Daily statistics for charts
+  // Daily statistics for charts (responds dynamically to selected timeframe)
   const dailySeriesData = useMemo(() => {
-    return allMonthDates.map(({ date, day }) => {
+    return filteredDates.map(({ date, day }) => {
       const log = currentMonthLogs.find(l => l.date === date);
       let dayMeals = 0;
       let eatersCount = 0;
@@ -259,7 +259,7 @@ export default function ManagerAnalyticsDashboard({
         eatersCount,
       };
     });
-  }, [allMonthDates, currentMonthLogs, currentMonthBazaars]);
+  }, [filteredDates, currentMonthLogs, currentMonthBazaars]);
 
   // Max values for chart scaling
   const maxMealsOnDay = useMemo(() => {
@@ -394,9 +394,9 @@ export default function ManagerAnalyticsDashboard({
       {/* =========================================================================
           TOP EXECUTIVE HEADER & CONTROLS
           ========================================================================= */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200/90 rounded-xl p-5 sm:p-6 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-slate-500 text-xs font-medium mb-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-slate-500 text-xs font-medium mb-1 font-mono tabular-nums">
             <span>Mess Analytics</span>
             <span aria-hidden="true">·</span>
             <span>{activeMonthStr}</span>
@@ -404,8 +404,8 @@ export default function ManagerAnalyticsDashboard({
             <span>{activeBoarders.length} Active Boarders</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
-            <BarChart3 className="w-6 h-6 text-blue-600" />
-            Manager Analytics & Intelligence
+            <BarChart3 className="w-5 h-5 text-blue-600" />
+            <span>Manager Analytics & Intelligence</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
             Real-time cashflow runway, meal rate dynamics, kitchen consumption patterns, and member risk matrix.
@@ -415,10 +415,10 @@ export default function ManagerAnalyticsDashboard({
         {/* Timeframe & Action Controls */}
         <div className="flex flex-wrap items-center gap-2.5">
           {/* Segmented Timeframe Filter */}
-          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl text-xs font-semibold">
+          <div className="flex items-center gap-0.5 p-1 bg-slate-100 border border-slate-200/70 rounded-lg text-xs font-semibold">
             <button
               onClick={() => setTimeframe('all')}
-              className={`px-3 py-1.5 rounded-lg cursor-pointer transition-all ${
+              className={`px-3 py-1.5 rounded-md cursor-pointer transition-all whitespace-nowrap shrink-0 ${
                 timeframe === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -426,7 +426,7 @@ export default function ManagerAnalyticsDashboard({
             </button>
             <button
               onClick={() => setTimeframe('last7')}
-              className={`px-3 py-1.5 rounded-lg cursor-pointer transition-all ${
+              className={`px-3 py-1.5 rounded-md cursor-pointer transition-all whitespace-nowrap shrink-0 ${
                 timeframe === 'last7' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -434,7 +434,7 @@ export default function ManagerAnalyticsDashboard({
             </button>
             <button
               onClick={() => setTimeframe('last14')}
-              className={`px-3 py-1.5 rounded-lg cursor-pointer transition-all hidden sm:block ${
+              className={`px-3 py-1.5 rounded-md cursor-pointer transition-all whitespace-nowrap shrink-0 hidden sm:block ${
                 timeframe === 'last14' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -446,17 +446,17 @@ export default function ManagerAnalyticsDashboard({
           <button
             onClick={handleCopyBriefing}
             id="btn-copy-analytics-brief"
-            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-3.5 py-2 rounded-xl transition-all cursor-pointer shadow-xs shrink-0"
+            className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-3.5 py-2 rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0"
             title="Copy complete structured executive briefing for WhatsApp or records"
           >
             {copiedBriefing ? (
               <>
-                <Check className="w-4 h-4 text-emerald-400" />
-                <span>Briefing Copied!</span>
+                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Briefing Copied</span>
               </>
             ) : (
               <>
-                <Copy className="w-4 h-4 text-slate-300" />
+                <Copy className="w-3.5 h-3.5 text-slate-300" />
                 <span>Copy Briefing</span>
               </>
             )}
@@ -583,36 +583,36 @@ export default function ManagerAnalyticsDashboard({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* CHART 1: DAILY MEAL CONSUMPTION TIMELINE (2 COLUMNS) */}
-        <div className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-2 bg-white border border-slate-200/90 rounded-xl p-5 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
                   <Utensils className="w-4 h-4 text-blue-600" />
-                  Daily Meal Consumption Timeline
+                  <span>Daily Meal Consumption Timeline</span>
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Kitchen attendance and meal load across all {daysInMonth} days of {activeMonthStr}.
+                  Kitchen attendance across {dailySeriesData.length} displayed day{dailySeriesData.length !== 1 ? 's' : ''} of {activeMonthStr}.
                 </p>
               </div>
 
               {/* Legend & Hover Info */}
               <div className="flex items-center gap-3 text-xs">
                 {hoveredChartDay ? (
-                  <div className="bg-slate-900 text-white px-2.5 py-1 rounded-lg text-xs font-mono flex items-center gap-2 animate-fadeIn">
+                  <div className="bg-slate-900 text-white px-2.5 py-1 rounded-md text-xs font-mono tabular-nums flex items-center gap-2">
                     <span>Day {hoveredChartDay.dayNum}:</span>
                     <strong className="text-blue-300">{hoveredChartDay.meals} meals</strong>
                     <span className="text-slate-400">({hoveredChartDay.eatersCount} eaters)</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-3 text-xs text-slate-500">
-                    <span className="flex items-center gap-1">
-                      <span className="w-3 h-3 bg-blue-600 rounded-xs inline-block" />
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 bg-blue-600 rounded-xs inline-block" />
                       Meals Logged
                     </span>
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1.5 font-mono tabular-nums">
                       <span className="w-3 h-0.5 border-t border-dashed border-slate-400 inline-block" />
-                      Daily Average ({avgMealsPerDay.toFixed(1)})
+                      Avg ({avgMealsPerDay.toFixed(1)})
                     </span>
                   </div>
                 )}
@@ -622,19 +622,23 @@ export default function ManagerAnalyticsDashboard({
             {/* Pure SVG Responsive Bar Chart */}
             <div className="mt-4 pt-2">
               <div className="relative h-44 sm:h-52 w-full">
-                <svg className="w-full h-full overflow-visible" viewBox={`0 0 ${daysInMonth * 12 + 20} 100`} preserveAspectRatio="none">
+                <svg
+                  className="w-full h-full overflow-visible"
+                  viewBox={`0 0 ${Math.max(1, dailySeriesData.length) * 14 + 16} 100`}
+                  preserveAspectRatio="none"
+                >
                   {/* Grid Lines */}
-                  <line x1="0" y1="25" x2={daysInMonth * 12 + 20} y2="25" stroke="#E2E8F0" strokeWidth="0.5" strokeDasharray="2,2" />
-                  <line x1="0" y1="50" x2={daysInMonth * 12 + 20} y2="50" stroke="#E2E8F0" strokeWidth="0.5" strokeDasharray="2,2" />
-                  <line x1="0" y1="75" x2={daysInMonth * 12 + 20} y2="75" stroke="#E2E8F0" strokeWidth="0.5" strokeDasharray="2,2" />
-                  <line x1="0" y1="99" x2={daysInMonth * 12 + 20} y2="99" stroke="#CBD5E1" strokeWidth="1" />
+                  <line x1="0" y1="25" x2={Math.max(1, dailySeriesData.length) * 14 + 16} y2="25" stroke="#E2E8F0" strokeWidth="0.5" strokeDasharray="2,2" />
+                  <line x1="0" y1="50" x2={Math.max(1, dailySeriesData.length) * 14 + 16} y2="50" stroke="#E2E8F0" strokeWidth="0.5" strokeDasharray="2,2" />
+                  <line x1="0" y1="75" x2={Math.max(1, dailySeriesData.length) * 14 + 16} y2="75" stroke="#E2E8F0" strokeWidth="0.5" strokeDasharray="2,2" />
+                  <line x1="0" y1="99" x2={Math.max(1, dailySeriesData.length) * 14 + 16} y2="99" stroke="#CBD5E1" strokeWidth="1" />
 
                   {/* Daily Average Dotted Reference Line */}
                   {maxMealsOnDay > 0 && (
                     <line 
                       x1="0" 
                       y1={99 - (avgMealsPerDay / maxMealsOnDay) * 90} 
-                      x2={daysInMonth * 12 + 20} 
+                      x2={Math.max(1, dailySeriesData.length) * 14 + 16} 
                       y2={99 - (avgMealsPerDay / maxMealsOnDay) * 90} 
                       stroke="#94A3B8" 
                       strokeWidth="0.8" 
@@ -645,7 +649,7 @@ export default function ManagerAnalyticsDashboard({
                   {/* Bars for Each Day */}
                   {dailySeriesData.map((d, index) => {
                     const barHeight = maxMealsOnDay > 0 ? (d.meals / maxMealsOnDay) * 90 : 0;
-                    const x = index * 12 + 8;
+                    const x = index * 14 + 6;
                     const y = 99 - barHeight;
                     const isHovered = hoveredChartDay?.date === d.date;
 
@@ -656,14 +660,11 @@ export default function ManagerAnalyticsDashboard({
                         onMouseEnter={() => setHoveredChartDay(d)}
                         onMouseLeave={() => setHoveredChartDay(null)}
                       >
-                        {/* Background Hit Target for easy touch/hover */}
-                        <rect x={x - 2} y="0" width="12" height="100" fill="transparent" />
-
-                        {/* Visual Bar */}
+                        <rect x={x - 2} y="0" width="14" height="100" fill="transparent" />
                         <rect 
                           x={x} 
                           y={y} 
-                          width="8" 
+                          width="9" 
                           height={Math.max(1, barHeight)} 
                           rx="1.5"
                           fill={isHovered ? '#1D4ED8' : d.meals > avgMealsPerDay * 1.2 ? '#2563EB' : '#60A5FA'}
@@ -675,29 +676,32 @@ export default function ManagerAnalyticsDashboard({
                 </svg>
               </div>
 
-              {/* Day Labels Under Chart */}
-              <div className="flex justify-between text-[9px] font-mono text-slate-400 mt-2 px-1">
-                <span>Day 1</span>
-                <span>Day 5</span>
-                <span>Day 10</span>
-                <span>Day 15</span>
-                <span>Day 20</span>
-                <span>Day 25</span>
-                <span>Day {daysInMonth}</span>
-              </div>
+              {/* Dynamic Day Labels Under Chart */}
+              {dailySeriesData.length > 0 && (
+                <div className="flex justify-between text-[10px] font-mono tabular-nums text-slate-400 mt-2 px-1">
+                  <span>Day {dailySeriesData[0].dayNum}</span>
+                  {dailySeriesData.length > 6 && (
+                    <span>Day {dailySeriesData[Math.floor(dailySeriesData.length / 3)].dayNum}</span>
+                  )}
+                  {dailySeriesData.length > 3 && (
+                    <span>Day {dailySeriesData[Math.floor((dailySeriesData.length * 2) / 3)].dayNum}</span>
+                  )}
+                  <span>Day {dailySeriesData[dailySeriesData.length - 1].dayNum}</span>
+                </div>
+              )}
             </div>
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
             <span>
-              Highest Attendance: <strong className="text-slate-800 font-mono">{Math.max(...dailySeriesData.map(d => d.meals))} meals</strong>
+              Peak Day: <strong className="text-slate-900 font-mono tabular-nums">{Math.max(0, ...dailySeriesData.map(d => d.meals))} meals</strong>
             </span>
             <span>
-              Kitchen Active Days: <strong className="text-slate-800 font-mono">{dailySeriesData.filter(d => d.meals > 0).length} of {daysInMonth} days</strong>
+              Active Days: <strong className="text-slate-900 font-mono tabular-nums">{dailySeriesData.filter(d => d.meals > 0).length} of {dailySeriesData.length}</strong>
             </span>
             <button
               onClick={() => onNavigateToTab?.('meals')}
-              className="text-blue-600 hover:text-blue-700 font-bold hover:underline cursor-pointer"
+              className="text-blue-600 hover:text-blue-700 font-semibold hover:underline cursor-pointer whitespace-nowrap shrink-0"
             >
               Open Daily Meal Log →
             </button>
@@ -705,21 +709,21 @@ export default function ManagerAnalyticsDashboard({
         </div>
 
         {/* CHART 2: EXPENDITURE BREAKDOWN (DONUT & PERCENTAGES) */}
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs flex flex-col justify-between">
+        <div className="bg-white border border-slate-200/90 rounded-xl p-5 shadow-xs flex flex-col justify-between">
           <div>
             <div className="pb-3 border-b border-slate-100">
               <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
                 <PieChart className="w-4 h-4 text-purple-600" />
-                Cost Share Distribution
+                <span>Cost Share Distribution</span>
               </h3>
-              <p className="text-xs text-slate-500">
-                Where mess funds are spent this month (Total: ৳{grandTotalCost.toLocaleString('en-IN')}).
+              <p className="text-xs text-slate-500 font-mono tabular-nums">
+                Monthly expenditure total: ৳{grandTotalCost.toLocaleString('en-IN')}
               </p>
             </div>
 
             {/* Proportional Stack Bar */}
             <div className="mt-4">
-              <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden flex shadow-inner">
+              <div className="h-3.5 w-full bg-slate-100 rounded-full overflow-hidden flex border border-slate-200/60">
                 {expenseCategories.map((cat, idx) => (
                   <div
                     key={idx}
@@ -735,15 +739,15 @@ export default function ManagerAnalyticsDashboard({
             <div className="mt-4 space-y-2 overflow-y-auto max-h-56 pr-1 text-xs">
               {expenseCategories.map((cat, idx) => (
                 <div key={idx} className="flex items-center justify-between py-1 border-b border-slate-50">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
-                    <span className="font-medium text-slate-700 truncate max-w-[120px]" title={cat.name}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-xs shrink-0" style={{ backgroundColor: cat.color }} />
+                    <span className="font-medium text-slate-700 truncate max-w-[130px]" title={cat.name}>
                       {cat.name}
                     </span>
                   </div>
-                  <div className="text-right font-mono">
-                    <span className="font-bold text-slate-900">৳ {cat.amount.toLocaleString('en-IN')}</span>
-                    <span className="text-[10px] text-slate-400 ml-1.5">({cat.percentage.toFixed(1)}%)</span>
+                  <div className="text-right font-mono tabular-nums shrink-0">
+                    <span className="font-semibold text-slate-900">৳ {cat.amount.toLocaleString('en-IN')}</span>
+                    <span className="text-[11px] text-slate-400 ml-1.5">({cat.percentage.toFixed(1)}%)</span>
                   </div>
                 </div>
               ))}
@@ -751,10 +755,10 @@ export default function ManagerAnalyticsDashboard({
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
-            <span>Fixed Bills: ৳{totalFixedCost.toLocaleString('en-IN')}</span>
+            <span className="font-mono tabular-nums">Fixed Bills: ৳{totalFixedCost.toLocaleString('en-IN')}</span>
             <button
               onClick={() => onNavigateToTab?.('fixed')}
-              className="text-blue-600 hover:text-blue-700 font-bold hover:underline cursor-pointer"
+              className="text-blue-600 hover:text-blue-700 font-semibold hover:underline cursor-pointer whitespace-nowrap shrink-0"
             >
               Manage Bills →
             </button>
@@ -766,24 +770,24 @@ export default function ManagerAnalyticsDashboard({
       {/* =========================================================================
           SECTION 3: DAILY BAZAAR SHOPPING & CASH OUTFLOW CURVE
           ========================================================================= */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs">
+      <div className="bg-white border border-slate-200/90 rounded-xl p-5 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
           <div>
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
               <ShoppingCart className="w-4 h-4 text-emerald-600" />
-              Daily Bazaar Expense & Shopping Outflow
+              <span>Daily Bazaar Expense & Shopping Outflow</span>
             </h3>
             <p className="text-xs text-slate-500">
-              Purchases across {currentMonthBazaars.length} shopping runs. Peak days highlight bulk market replenishment.
+              Purchases across {currentMonthBazaars.length} shopping runs ({dailySeriesData.length}-day window).
             </p>
           </div>
 
           <div className="flex items-center gap-3 text-xs">
             <span className="text-slate-500">
-              Total Spent: <strong className="text-slate-900 font-mono">৳ {totalBazaarSpent.toLocaleString('en-IN')}</strong>
+              Window Bazaar: <strong className="text-slate-900 font-mono tabular-nums">৳ {dailySeriesData.reduce((s, d) => s + d.bazaar, 0).toLocaleString('en-IN')}</strong>
             </span>
             {totalPendingShopDues > 0 && (
-              <span className="text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-mono text-[11px]">
+              <span className="text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 font-mono tabular-nums text-[11px]">
                 Pending Vendor Due: ৳{totalPendingShopDues.toLocaleString('en-IN')}
               </span>
             )}
@@ -793,13 +797,17 @@ export default function ManagerAnalyticsDashboard({
         {/* Bazaar Bar Wave SVG */}
         <div className="mt-4 pt-1">
           <div className="relative h-36 sm:h-44 w-full">
-            <svg className="w-full h-full overflow-visible" viewBox={`0 0 ${daysInMonth * 12 + 20} 100`} preserveAspectRatio="none">
-              <line x1="0" y1="50" x2={daysInMonth * 12 + 20} y2="50" stroke="#F1F5F9" strokeWidth="0.8" />
-              <line x1="0" y1="99" x2={daysInMonth * 12 + 20} y2="99" stroke="#CBD5E1" strokeWidth="1" />
+            <svg
+              className="w-full h-full overflow-visible"
+              viewBox={`0 0 ${Math.max(1, dailySeriesData.length) * 14 + 16} 100`}
+              preserveAspectRatio="none"
+            >
+              <line x1="0" y1="50" x2={Math.max(1, dailySeriesData.length) * 14 + 16} y2="50" stroke="#F1F5F9" strokeWidth="0.8" />
+              <line x1="0" y1="99" x2={Math.max(1, dailySeriesData.length) * 14 + 16} y2="99" stroke="#CBD5E1" strokeWidth="1" />
 
               {dailySeriesData.map((d, index) => {
                 const barHeight = maxBazaarOnDay > 0 ? (d.bazaar / maxBazaarOnDay) * 90 : 0;
-                const x = index * 12 + 8;
+                const x = index * 14 + 6;
                 const y = 99 - barHeight;
 
                 return (
@@ -808,7 +816,7 @@ export default function ManagerAnalyticsDashboard({
                     <rect 
                       x={x} 
                       y={y} 
-                      width="8" 
+                      width="9" 
                       height={Math.max(barHeight > 0 ? 2 : 0, barHeight)} 
                       rx="1.5"
                       fill={d.bazaar > avgDailyBazaarCost * 1.5 ? '#059669' : '#34D399'}
@@ -819,12 +827,15 @@ export default function ManagerAnalyticsDashboard({
             </svg>
           </div>
 
-          <div className="flex justify-between text-[9px] font-mono text-slate-400 mt-2 px-1">
-            <span>Day 1</span>
-            <span>Day 10</span>
-            <span>Day 20</span>
-            <span>Day {daysInMonth}</span>
-          </div>
+          {dailySeriesData.length > 0 && (
+            <div className="flex justify-between text-[10px] font-mono tabular-nums text-slate-400 mt-2 px-1">
+              <span>Day {dailySeriesData[0].dayNum}</span>
+              {dailySeriesData.length > 6 && (
+                <span>Day {dailySeriesData[Math.floor(dailySeriesData.length / 2)].dayNum}</span>
+              )}
+              <span>Day {dailySeriesData[dailySeriesData.length - 1].dayNum}</span>
+            </div>
+          )}
         </div>
 
         {/* Shoppers Summary Strip */}
@@ -851,14 +862,14 @@ export default function ManagerAnalyticsDashboard({
       {/* =========================================================================
           SECTION 4: BOARDER FINANCIAL RISK MATRIX (EARLY WARNING)
           ========================================================================= */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
+      <div className="bg-white border border-slate-200/90 rounded-xl p-5 shadow-xs space-y-4">
         
         {/* Header & Matrix Filter Strip */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-100">
           <div>
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
               <ShieldAlert className="w-4 h-4 text-amber-600" />
-              Member Financial Health & Receivables Matrix
+              <span>Member Financial Health & Receivables Matrix</span>
             </h3>
             <p className="text-xs text-slate-500">
               Ranked member balances to identify overdue accounts, zero-deposit warnings, and advance credits.
@@ -874,39 +885,39 @@ export default function ManagerAnalyticsDashboard({
                 placeholder="Search member or room..."
                 value={searchMember}
                 onChange={(e) => setSearchMember(e.target.value)}
-                className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-blue-500 focus:bg-white w-44"
+                className="pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-blue-500 focus:bg-white w-44"
               />
             </div>
 
-            <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl text-xs font-semibold">
+            <div className="flex items-center gap-0.5 bg-slate-100 border border-slate-200/70 p-0.5 rounded-lg text-xs font-semibold">
               <button
                 onClick={() => setRiskFilter('all')}
-                className={`px-2.5 py-1 rounded-lg cursor-pointer ${
-                  riskFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600'
+                className={`px-2.5 py-1 rounded-md cursor-pointer whitespace-nowrap shrink-0 ${
+                  riskFilter === 'all' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 All ({boardersReport.length})
               </button>
               <button
                 onClick={() => setRiskFilter('high_due')}
-                className={`px-2.5 py-1 rounded-lg cursor-pointer ${
-                  riskFilter === 'high_due' ? 'bg-white text-rose-700 shadow-2xs font-bold' : 'text-slate-600'
+                className={`px-2.5 py-1 rounded-md cursor-pointer whitespace-nowrap shrink-0 ${
+                  riskFilter === 'high_due' ? 'bg-white text-rose-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Heavy Due (&gt;৳1k)
               </button>
               <button
                 onClick={() => setRiskFilter('zero_deposit')}
-                className={`px-2.5 py-1 rounded-lg cursor-pointer ${
-                  riskFilter === 'zero_deposit' ? 'bg-white text-amber-700 shadow-2xs font-bold' : 'text-slate-600'
+                className={`px-2.5 py-1 rounded-md cursor-pointer whitespace-nowrap shrink-0 ${
+                  riskFilter === 'zero_deposit' ? 'bg-white text-amber-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Zero Deposit ({zeroDepositCount})
               </button>
               <button
                 onClick={() => setRiskFilter('surplus')}
-                className={`px-2.5 py-1 rounded-lg cursor-pointer ${
-                  riskFilter === 'surplus' ? 'bg-white text-emerald-700 shadow-2xs font-bold' : 'text-slate-600'
+                className={`px-2.5 py-1 rounded-md cursor-pointer whitespace-nowrap shrink-0 ${
+                  riskFilter === 'surplus' ? 'bg-white text-emerald-700 shadow-2xs font-bold' : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
                 Surplus ({surplusBoardersCount})
@@ -916,10 +927,10 @@ export default function ManagerAnalyticsDashboard({
         </div>
 
         {/* Matrix Table */}
-        <div className="overflow-x-auto border border-slate-200 rounded-xl">
+        <div className="overflow-x-auto border border-slate-200 rounded-lg">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-50 text-slate-600 uppercase text-[9.5px] font-bold tracking-wider border-b border-slate-200">
+              <tr className="bg-slate-50 text-slate-600 uppercase text-[10px] font-bold tracking-wider border-b border-slate-200">
                 <th className="p-2.5 text-center w-8">#</th>
                 <th className="p-2.5">Member Name</th>
                 <th className="p-2.5 text-center">Meals</th>
@@ -948,23 +959,23 @@ export default function ManagerAnalyticsDashboard({
 
                   return (
                     <tr key={b.boarderId} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="p-2.5 text-center text-slate-400 font-mono">{idx + 1}</td>
-                      <td className="p-2.5 font-bold text-slate-900">
+                      <td className="p-2.5 text-center text-slate-400 font-mono tabular-nums">{idx + 1}</td>
+                      <td className="p-2.5 font-semibold text-slate-900">
                         <div className="flex items-center gap-1.5">
                           <span>{b.boarderName}</span>
                           {bd?.roomNo && (
-                            <span className="text-[9px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-mono font-medium">
+                            <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-mono font-medium">
                               {bd.roomNo}
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="p-2.5 text-center font-semibold font-mono">{b.totalMeals}</td>
-                      <td className="p-2.5 text-right font-mono text-slate-600">৳ {b.mealCost.toFixed(2)}</td>
-                      <td className="p-2.5 text-right font-mono text-slate-600">৳ {b.fixedCostShare.toFixed(2)}</td>
-                      <td className="p-2.5 text-right font-mono font-bold text-slate-900">৳ {b.totalCost.toFixed(2)}</td>
-                      <td className="p-2.5 text-right font-mono font-bold text-blue-700">৳ {b.totalDeposit.toFixed(2)}</td>
-                      <td className="p-2.5 text-right font-mono font-bold">
+                      <td className="p-2.5 text-center font-semibold font-mono tabular-nums">{b.totalMeals}</td>
+                      <td className="p-2.5 text-right font-mono tabular-nums text-slate-600">৳ {b.mealCost.toFixed(2)}</td>
+                      <td className="p-2.5 text-right font-mono tabular-nums text-slate-600">৳ {b.fixedCostShare.toFixed(2)}</td>
+                      <td className="p-2.5 text-right font-mono tabular-nums font-bold text-slate-900">৳ {b.totalCost.toFixed(2)}</td>
+                      <td className="p-2.5 text-right font-mono tabular-nums font-bold text-blue-700">৳ {b.totalDeposit.toFixed(2)}</td>
+                      <td className="p-2.5 text-right font-mono tabular-nums font-bold">
                         <span className={`px-2 py-0.5 rounded text-[11px] ${
                           isDue ? 'text-rose-700 bg-rose-50' : 'text-emerald-700 bg-emerald-50'
                         }`}>
@@ -973,19 +984,19 @@ export default function ManagerAnalyticsDashboard({
                       </td>
                       <td className="p-2.5 text-center">
                         {isZeroDep ? (
-                          <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded">
+                          <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded whitespace-nowrap">
                             Zero Deposit
                           </span>
                         ) : isSevereDue ? (
-                          <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded">
+                          <span className="text-[10px] bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded whitespace-nowrap">
                             Heavy Due
                           </span>
                         ) : isDue ? (
-                          <span className="text-[10px] bg-slate-100 text-slate-700 font-medium px-2 py-0.5 rounded">
+                          <span className="text-[10px] bg-slate-100 text-slate-700 font-medium px-2 py-0.5 rounded whitespace-nowrap">
                             Standard Due
                           </span>
                         ) : (
-                          <span className="text-[10px] bg-emerald-100 text-emerald-800 font-medium px-2 py-0.5 rounded">
+                          <span className="text-[10px] bg-emerald-100 text-emerald-800 font-medium px-2 py-0.5 rounded whitespace-nowrap">
                             Surplus
                           </span>
                         )}
@@ -994,11 +1005,11 @@ export default function ManagerAnalyticsDashboard({
                         {isDue ? (
                           <button
                             onClick={() => handleCopyReminder(b)}
-                            className="text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1 w-full"
+                            className="text-[11px] font-semibold bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 px-2.5 py-1 rounded-md transition-colors cursor-pointer flex items-center justify-center gap-1 w-full whitespace-nowrap"
                             title="Copy custom WhatsApp reminder message for this member"
                           >
                             {copiedMemberId === b.boarderId ? (
-                              <span className="text-emerald-600 font-bold">Copied!</span>
+                              <span className="text-emerald-600 font-bold">Copied</span>
                             ) : (
                               <>
                                 <Copy className="w-3 h-3 text-slate-500" />
@@ -1007,7 +1018,7 @@ export default function ManagerAnalyticsDashboard({
                             )}
                           </button>
                         ) : (
-                          <span className="text-[10px] text-slate-400">Paid in Full</span>
+                          <span className="text-[11px] text-slate-400">Paid in Full</span>
                         )}
                       </td>
                     </tr>
@@ -1023,10 +1034,10 @@ export default function ManagerAnalyticsDashboard({
       {/* =========================================================================
           SECTION 5: SYNTHESIZED EXECUTIVE RECOMMENDATIONS & OPERATIONAL INSIGHTS
           ========================================================================= */}
-      <div className="bg-slate-900 text-white rounded-2xl p-5 sm:p-6 shadow-md space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+      <div className="bg-slate-900 text-white rounded-xl p-5 sm:p-6 border border-slate-800 shadow-xs space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-amber-400" />
+            <ShieldCheck className="w-5 h-5 text-emerald-400" />
             <h3 className="text-sm font-bold uppercase tracking-wider text-white">
               Automated Operational Insights & Action Plan
             </h3>

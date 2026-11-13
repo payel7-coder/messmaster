@@ -83,52 +83,48 @@ export default function RoleSelector({
   };
 
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs print:hidden">
+    <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/90 sticky top-0 z-30 print:hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between py-3 gap-3">
+        <div className="flex flex-wrap items-center justify-between min-h-16 py-2.5 gap-4">
           
-          {/* Brand Logo & Month info */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-100 font-bold text-lg select-none">
+          {/* Zone 1: Clean Brand Lockup */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-base tracking-tight select-none">
               M
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-slate-900 tracking-tight">MessMaster</h1>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                  <Globe className="w-2.5 h-2.5" />
-                  Public Portal
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium mt-0.5">
-                <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                <span>Active Period:</span>
-                <span className="text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded font-mono font-semibold">
+              <h1 className="text-lg font-bold text-slate-900 tracking-tight leading-none whitespace-nowrap">
+                MessMaster
+              </h1>
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium mt-1 whitespace-nowrap">
+                <span>{role === 'manager' ? 'Manager Workspace' : 'Public Ledger'}</span>
+                <span aria-hidden="true" className="text-slate-300">·</span>
+                <span className="font-mono tabular-nums text-slate-700 font-semibold">
                   {currentMonth}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Center Action: Simulation shortcut if empty */}
+          {/* Center Empty State Shortcut */}
           {!hasData && (
-            <div className="flex items-center bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 text-amber-800 text-xs md:mx-auto">
-              <span>No logs found for this month.</span>
+            <div className="hidden lg:flex items-center gap-2.5 bg-amber-50/70 border border-amber-200/80 rounded-lg px-3 py-1.5 text-amber-900 text-xs">
+              <span>No active logs for {currentMonth}</span>
               <button
                 onClick={onSimulateData}
-                className="ml-2 flex items-center gap-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold px-2 py-0.5 rounded cursor-pointer transition-all"
+                className="flex items-center gap-1 bg-amber-600 hover:bg-amber-700 text-white font-semibold px-2.5 py-1 rounded-md cursor-pointer transition-colors whitespace-nowrap shrink-0"
               >
                 <RefreshCw className="w-3 h-3" />
-                Load Sample Data
+                <span>Load Sample Data</span>
               </button>
             </div>
           )}
 
-          {/* Mode Switchers & Auth Controls */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl">
+          {/* Zone 2 & 3: Mode Switcher, Boarder Selector, and Auth */}
+          <div className="flex flex-wrap items-center gap-2.5 ml-auto">
+            <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200/60">
               
-              {/* Boarder / Public Dashboard Button (No login needed) */}
+              {/* Boarder / Public Dashboard Button */}
               <button
                 onClick={() => {
                   setRole('boarder');
@@ -138,52 +134,46 @@ export default function RoleSelector({
                   if (onNavigateTab) onNavigateTab('dashboard');
                 }}
                 id="btn-role-boarder"
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-all whitespace-nowrap shrink-0 ${
                   role === 'boarder'
-                    ? 'bg-white text-slate-900 shadow-xs'
+                    ? 'bg-white text-slate-900 shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
-                title="Boarder view is open to the public without login"
+                title="Public read-only view for boarders"
               >
-                <User className="w-4 h-4 text-blue-600" />
-                <span>Boarder Dashboard</span>
-                <span className="text-[10px] font-normal text-slate-400 hidden sm:inline">(Public)</span>
+                <User className="w-3.5 h-3.5 text-blue-600" />
+                <span>Boarder View</span>
               </button>
 
-              {/* Manager Portal Button (Protected) */}
+              {/* Manager Portal Button */}
               <button
                 onClick={handleManagerClick}
                 id="btn-role-manager"
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition-all whitespace-nowrap shrink-0 ${
                   role === 'manager'
-                    ? 'bg-white text-slate-900 shadow-xs'
+                    ? 'bg-white text-slate-900 shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
-                title={isManagerAuthenticated ? "Access Manager Portal" : "Manager sign in required (Google / PIN)"}
+                title={isManagerAuthenticated ? "Access Manager Console" : "Manager authentication required"}
               >
                 {isManagerAuthenticated ? (
-                  <Shield className="w-4 h-4 text-emerald-600" />
+                  <Shield className="w-3.5 h-3.5 text-emerald-600" />
                 ) : (
-                  <Lock className="w-3.5 h-3.5 text-amber-600" />
+                  <Lock className="w-3.5 h-3.5 text-slate-500" />
                 )}
-                <span>Manager Portal</span>
-                {!isManagerAuthenticated && (
-                  <span className="text-[10px] font-medium bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded flex items-center gap-1">
-                    Sign in
-                  </span>
-                )}
+                <span>Manager</span>
               </button>
             </div>
 
             {/* Boarder selector dropdown when in Boarder role */}
             {role === 'boarder' && activeBoarders.length > 0 && (
-              <div className="flex items-center gap-1.5 animate-fadeIn bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
-                <span className="text-xs text-slate-500 font-medium">Viewing as:</span>
+              <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg">
+                <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap">Member:</span>
                 <select
                   value={selectedBoarderId}
                   onChange={(e) => setSelectedBoarderId(e.target.value)}
                   id="select-boarder-view"
-                  className="bg-transparent text-slate-900 text-xs font-semibold cursor-pointer focus:outline-hidden"
+                  className="bg-transparent text-slate-900 text-xs font-semibold cursor-pointer focus:outline-hidden max-w-[160px] truncate"
                 >
                   {activeBoarders.map((b) => (
                     <option key={b.id} value={b.id}>

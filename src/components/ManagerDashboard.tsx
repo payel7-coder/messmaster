@@ -935,53 +935,56 @@ export default function ManagerDashboard({
     <div className="space-y-6 animate-fadeIn">
 
       {/* Top Action & Monthly PDF Export Bar */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+      <div className="bg-white border border-slate-200/90 rounded-xl p-4 sm:p-5 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-3.5">
+          <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-700 shrink-0">
             <FileText className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              Manager Operations & Audit
-              <span className="text-[10px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-100 font-mono">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">
+                Manager Operations & Audit
+              </h2>
+              <span className="text-slate-300" aria-hidden="true">·</span>
+              <span className="text-xs font-medium text-slate-600 font-mono tabular-nums">
                 {formatReadableMonth(settings.currentMonth)}
               </span>
-            </h2>
-            <p className="text-xs text-slate-500">
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
               Track daily bazaar, meal consumption, fixed bills, and generate certified monthly statements.
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setActiveTab('bazaar')}
             id="btn-quick-daily-cost"
-            className="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs px-3.5 py-2.5 rounded-xl cursor-pointer transition-all shadow-xs shrink-0"
+            className="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>+ Daily Cost</span>
+            <span>Daily Cost</span>
           </button>
 
           <button
             onClick={() => setActiveTab('deposits')}
             id="btn-quick-deposit"
-            className="flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs px-3.5 py-2.5 rounded-xl cursor-pointer transition-all shrink-0"
+            className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>+ Deposit</span>
+            <Plus className="w-3.5 h-3.5 text-slate-500" />
+            <span>Deposit</span>
           </button>
 
           <button
             onClick={() => setShowSpecialMealModal(true)}
             id="btn-manager-special-meal"
-            className="flex items-center justify-center gap-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 font-bold text-xs px-3.5 py-2.5 rounded-xl cursor-pointer transition-all shrink-0 shadow-2xs"
+            className="flex items-center justify-center gap-1.5 bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
             title="Manage Special Feast / Meal costs distributed strictly among participating boarders (excluded from regular meal rate)"
           >
-            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+            <UtensilsCrossed className="w-3.5 h-3.5 text-purple-600" />
             <span>Special Feast</span>
             {monthSpecialMeals.length > 0 && (
-              <span className="bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+              <span className="bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md font-mono tabular-nums leading-none">
                 {monthSpecialMeals.length}
               </span>
             )}
@@ -991,10 +994,10 @@ export default function ManagerDashboard({
             <button
               onClick={onOpenHandoverModal}
               id="btn-manager-handover"
-              className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs px-3.5 py-2.5 rounded-xl cursor-pointer transition-all shadow-xs shrink-0"
+              className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
               title="Close month, settle balances, and handover management to new manager"
             >
-              <ArrowRightLeft className="w-4 h-4 text-emerald-100" />
+              <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-100" />
               <span>Close & Handover</span>
             </button>
           )}
@@ -1002,33 +1005,33 @@ export default function ManagerDashboard({
           <button
             onClick={() => setActiveTab('analytics')}
             id="btn-manager-quick-analytics"
-            className={`flex items-center justify-center gap-2 font-bold text-xs px-3.5 py-2.5 rounded-xl cursor-pointer transition-all shadow-xs hover:shadow-md shrink-0 ${
+            className={`flex items-center justify-center gap-1.5 font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
               activeTab === 'analytics'
-                ? 'bg-blue-600 text-white shadow-blue-200'
-                : 'bg-slate-800 hover:bg-slate-900 text-white'
+                ? 'bg-slate-900 text-white'
+                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
             }`}
             title="Open Executive Analytics & Intelligence Dashboard"
           >
-            <BarChart3 className="w-4 h-4 text-indigo-300" />
+            <BarChart3 className={`w-3.5 h-3.5 ${activeTab === 'analytics' ? 'text-blue-400' : 'text-slate-500'}`} />
             <span>Analytics</span>
           </button>
 
           <button
             onClick={() => setShowMealSheetModal(true)}
             id="btn-manager-meal-sheet-pdf"
-            className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl cursor-pointer transition-all shadow-xs hover:shadow-md shrink-0"
+            className="flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
             title="Generate and export the monthly 31-day meal sheet for all boarders"
           >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
             <span>Meal Sheet PDF</span>
           </button>
 
           <button
             onClick={() => setShowPdfModal(true)}
             id="btn-manager-generate-pdf"
-            className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-3.5 py-2.5 rounded-xl cursor-pointer transition-all shadow-xs hover:shadow-md shrink-0"
+            className="flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
           >
-            <FileText className="w-4 h-4 text-blue-400" />
+            <FileText className="w-3.5 h-3.5 text-blue-400" />
             <span>Financial PDF</span>
           </button>
 
@@ -1039,11 +1042,11 @@ export default function ManagerDashboard({
               setShowPinModal(true);
             }}
             id="btn-manager-quick-pin"
-            className="flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs px-3.5 py-2.5 rounded-xl cursor-pointer transition-all shrink-0 border border-slate-200"
+            className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0 border border-slate-200"
             title="Manage Security PIN"
           >
-            <KeyRound className="w-3.5 h-3.5 text-blue-600" />
-            <span className="font-semibold">Security PIN</span>
+            <KeyRound className="w-3.5 h-3.5 text-slate-500" />
+            <span>Security PIN</span>
           </button>
         </div>
       </div>
@@ -1051,76 +1054,60 @@ export default function ManagerDashboard({
       {/* Top Level Financial Summary Banner */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
         
-        <div className="bg-blue-600 text-white p-4 rounded-xl shadow-xs">
-          <span className="text-[10px] text-blue-100 uppercase font-bold">Cash Deposits</span>
-          <p className="text-xl font-bold mt-1">৳ {totalCashDeposited.toLocaleString('en-IN')}</p>
-          <span className="text-[9.5px] text-blue-200">Total collected</span>
+        <div className="bg-slate-900 text-white p-4 rounded-xl border border-slate-800 shadow-xs flex flex-col justify-between">
+          <span className="text-[11px] text-slate-300 uppercase tracking-wider font-semibold">Cash Deposits</span>
+          <p className="text-xl font-bold mt-1.5 font-mono tabular-nums tracking-tight">৳ {totalCashDeposited.toLocaleString('en-IN')}</p>
+          <span className="text-[11px] text-slate-400 mt-1">Total collected</span>
         </div>
 
-        <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-xs">
-          <span className="text-[10px] text-slate-500 uppercase font-bold">Bazaar Costs</span>
-          <p className="text-xl font-bold text-slate-800 mt-1">৳ {totalBazaarSpent.toLocaleString('en-IN')}</p>
-          <span className="text-[9.5px] text-slate-400">Total consumption</span>
+        <div className="bg-white border border-slate-200/90 p-4 rounded-xl shadow-xs flex flex-col justify-between">
+          <span className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Bazaar Costs</span>
+          <p className="text-xl font-bold text-slate-900 mt-1.5 font-mono tabular-nums tracking-tight">৳ {totalBazaarSpent.toLocaleString('en-IN')}</p>
+          <span className="text-[11px] text-slate-500 mt-1">Total consumption</span>
         </div>
 
-        <div className={`p-4 rounded-xl shadow-xs border transition-colors ${
-          totalPendingBazaarDues > 0 ? 'bg-amber-50/70 border-amber-300' : 'bg-white border-slate-200'
+        <div className={`p-4 rounded-xl shadow-xs border flex flex-col justify-between transition-colors ${
+          totalPendingBazaarDues > 0 ? 'bg-amber-50/60 border-amber-200' : 'bg-white border-slate-200/90'
         }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-slate-500 uppercase font-bold">Shop Dues (বাকি)</span>
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Shop Dues (বাকি)</span>
             {totalPendingBazaarDues > 0 && (
-              <span className="text-[8.5px] font-bold bg-amber-200 text-amber-900 px-1.5 py-0.2 rounded-full">
-                Pending
-              </span>
+              <span className="text-[10px] font-semibold text-amber-800">Pending</span>
             )}
           </div>
-          <p className={`text-xl font-bold mt-1 ${totalPendingBazaarDues > 0 ? 'text-amber-700' : 'text-slate-800'}`}>
+          <p className={`text-xl font-bold mt-1.5 font-mono tabular-nums tracking-tight ${totalPendingBazaarDues > 0 ? 'text-amber-700' : 'text-slate-900'}`}>
             ৳ {totalPendingBazaarDues.toLocaleString('en-IN')}
           </p>
-          <span className="text-[9.5px] text-slate-400">
+          <span className="text-[11px] text-slate-500 mt-1">
             {totalPendingBazaarDues > 0 ? 'To adjust to cash' : 'Zero shop debt'}
           </span>
         </div>
 
-        <div className={`p-4 rounded-xl shadow-xs border transition-colors ${
-          remainingCash >= 0 ? 'bg-blue-50/40 border-blue-100' : 'bg-rose-50 border-rose-100'
+        <div className={`p-4 rounded-xl shadow-xs border flex flex-col justify-between transition-colors ${
+          remainingCash >= 0 ? 'bg-blue-50/40 border-blue-200/80' : 'bg-rose-50/60 border-rose-200'
         }`}>
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-slate-500 uppercase font-bold">Actual Cash</span>
-            {totalFixedBillsPaidFromCash > 0 && (
-              <span className="text-[8.5px] font-bold bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full font-mono" title={`৳${totalFixedBillsPaidFromCash.toLocaleString('en-IN')} paid out for fixed bills`}>
-                -৳{totalFixedBillsPaidFromCash.toLocaleString('en-IN')} bills
-              </span>
-            )}
-          </div>
-          <p className={`text-xl font-bold mt-1 ${remainingCash >= 0 ? 'text-blue-700' : 'text-rose-700'}`}>
+          <span className="text-[11px] text-slate-600 uppercase tracking-wider font-semibold">Actual Cash</span>
+          <p className={`text-xl font-bold mt-1.5 font-mono tabular-nums tracking-tight ${remainingCash >= 0 ? 'text-blue-700' : 'text-rose-700'}`}>
             ৳ {remainingCash.toLocaleString('en-IN')}
           </p>
           <span 
-            className="text-[9.5px] text-slate-500 font-medium block truncate cursor-help" 
+            className="text-[11px] text-slate-500 font-medium mt-1 truncate cursor-help" 
             title={`Actual Cash in Hand = Total Deposits (৳${totalCashDeposited.toLocaleString('en-IN')}) - Bazaar Cash (৳${totalBazaarCashPaid.toLocaleString('en-IN')}) - Fixed Bills Cash (৳${totalFixedBillsPaidFromCash.toLocaleString('en-IN')})`}
           >
-            Cash in Hand (হাতে নগদ)
+            {totalFixedBillsPaidFromCash > 0 ? `After -৳${totalFixedBillsPaidFromCash.toLocaleString('en-IN')} bills` : 'Cash in Hand (হাতে নগদ)'}
           </span>
         </div>
 
-        <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-xs">
-          <span className="text-[10px] text-slate-500 uppercase font-bold">Meal Rate</span>
-          <p className="text-xl font-extrabold text-blue-600 mt-1">৳ {report.mealRate.toFixed(4)}</p>
-          <span className="text-[9.5px] text-slate-400">Per meal share</span>
+        <div className="bg-white border border-slate-200/90 p-4 rounded-xl shadow-xs flex flex-col justify-between">
+          <span className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Meal Rate</span>
+          <p className="text-xl font-bold text-blue-600 mt-1.5 font-mono tabular-nums tracking-tight">৳ {report.mealRate.toFixed(4)}</p>
+          <span className="text-[11px] text-slate-500 mt-1">Per meal share</span>
         </div>
 
-        <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] text-slate-500 uppercase font-bold">Fixed Bills</span>
-            {totalFixedBillsPaidFromCash > 0 && (
-              <span className="text-[8px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.2 rounded-full font-mono">
-                ৳{totalFixedBillsPaidFromCash} cash
-              </span>
-            )}
-          </div>
-          <p className="text-xl font-bold text-slate-800 mt-1">৳ {report.totalFixedCost.toLocaleString('en-IN')}</p>
-          <span className="text-[9.5px] text-slate-400">
+        <div className="bg-white border border-slate-200/90 p-4 rounded-xl shadow-xs flex flex-col justify-between">
+          <span className="text-[11px] text-slate-500 uppercase tracking-wider font-semibold">Fixed Bills</span>
+          <p className="text-xl font-bold text-slate-900 mt-1.5 font-mono tabular-nums tracking-tight">৳ {report.totalFixedCost.toLocaleString('en-IN')}</p>
+          <span className="text-[11px] text-slate-500 mt-1">
             {totalFixedBillsPaidFromCash > 0 ? `৳${totalFixedBillsPaidFromCash.toLocaleString('en-IN')} paid from cash` : 'Shared utilities'}
           </span>
         </div>
@@ -1136,18 +1123,18 @@ export default function ManagerDashboard({
         const isOverBudget = budgetTarget > 0 && totalExpensesSpent > budgetTarget;
 
         return (
-          <div className={`p-4 sm:p-5 rounded-2xl border transition-all ${
+          <div className={`p-4 sm:p-5 rounded-xl border transition-colors ${
             budgetTarget === 0 
-              ? 'bg-slate-50 border-slate-200'
+              ? 'bg-slate-50/80 border-slate-200/90'
               : isOverBudget 
-              ? 'bg-rose-50/70 border-rose-200' 
+              ? 'bg-rose-50/50 border-rose-200' 
               : budgetSpentPct >= 85 
-              ? 'bg-amber-50/70 border-amber-200' 
-              : 'bg-white border-slate-200 shadow-xs'
+              ? 'bg-amber-50/50 border-amber-200' 
+              : 'bg-white border-slate-200/90 shadow-xs'
           }`}>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-3">
-                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border ${
                   budgetTarget === 0
                     ? 'bg-slate-100 text-slate-500 border-slate-200'
                     : isOverBudget
@@ -1156,26 +1143,26 @@ export default function ManagerDashboard({
                     ? 'bg-amber-100 text-amber-700 border-amber-200'
                     : 'bg-blue-50 text-blue-700 border-blue-200'
                 }`}>
-                  <Target className="w-5 h-5" />
+                  <Target className="w-4 h-4" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h4 className="font-bold text-slate-900 text-xs sm:text-sm">
                       Monthly Budget Target ({formatReadableMonth(settings.currentMonth)})
                     </h4>
                     {budgetTarget > 0 && (
-                      <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
                         isOverBudget 
-                          ? 'bg-rose-100 text-rose-800 animate-pulse' 
+                          ? 'bg-rose-100 text-rose-800 border border-rose-200' 
                           : budgetSpentPct >= 85
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-emerald-100 text-emerald-800'
+                          ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                          : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                       }`}>
                         {isOverBudget ? 'Over Budget' : `${budgetSpentPct.toFixed(1)}% Spent`}
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
+                  <p className="text-[11px] text-slate-500 mt-0.5 font-mono tabular-nums">
                     Bazaar Spent (৳{totalBazaarSpent.toLocaleString('en-IN')}) + Fixed Bills (৳{report.totalFixedCost.toLocaleString('en-IN')})
                   </p>
                 </div>
@@ -1184,28 +1171,28 @@ export default function ManagerDashboard({
               {/* Budget Numbers / Quick Action */}
               <div className="flex items-center gap-3 self-end sm:self-auto">
                 {budgetTarget > 0 ? (
-                  <div className="text-right">
-                    <div className="text-sm sm:text-base font-extrabold text-slate-900">
+                  <div className="text-right font-mono tabular-nums">
+                    <div className="text-sm sm:text-base font-bold text-slate-900">
                       ৳ {totalExpensesSpent.toLocaleString('en-IN')}{' '}
                       <span className="text-xs text-slate-400 font-normal">
                         / ৳ {budgetTarget.toLocaleString('en-IN')}
                       </span>
                     </div>
-                    <div className={`text-[11px] font-semibold ${
+                    <div className={`text-[11px] font-sans font-medium ${
                       isOverBudget 
-                        ? 'text-rose-600 font-bold' 
+                        ? 'text-rose-700 font-semibold' 
                         : remainingBudget < budgetTarget * 0.15 
-                        ? 'text-amber-600' 
+                        ? 'text-amber-700' 
                         : 'text-slate-500'
                     }`}>
                       {isOverBudget
-                        ? `⚠️ Exceeded budget by ৳ ${Math.abs(remainingBudget).toLocaleString('en-IN')}`
+                        ? `Exceeded budget by ৳ ${Math.abs(remainingBudget).toLocaleString('en-IN')}`
                         : `৳ ${remainingBudget.toLocaleString('en-IN')} remaining`}
                     </div>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-500 italic">No budget target set</span>
+                    <span className="text-xs text-slate-500">No budget target set</span>
                   </div>
                 )}
 
@@ -1224,10 +1211,10 @@ export default function ManagerDashboard({
                     }
                   }}
                   id="btn-quick-edit-budget-target"
-                  className="text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors shrink-0"
+                  className="text-xs font-semibold text-blue-700 bg-white hover:bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
                   title="Set or update monthly budget target"
                 >
-                  {budgetTarget > 0 ? 'Edit Target' : '+ Set Target'}
+                  {budgetTarget > 0 ? 'Edit Target' : 'Set Target'}
                 </button>
               </div>
             </div>
@@ -1235,7 +1222,7 @@ export default function ManagerDashboard({
             {/* Progress Bar Container */}
             {budgetTarget > 0 ? (
               <div>
-                <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden flex shadow-inner border border-slate-200/60 relative">
+                <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden flex border border-slate-200/70 relative">
                   {/* Bazaar segment */}
                   <div
                     style={{ width: `${Math.min(100, (totalBazaarSpent / budgetTarget) * 100)}%` }}
@@ -1245,24 +1232,24 @@ export default function ManagerDashboard({
                   {/* Fixed Bills segment */}
                   <div
                     style={{ width: `${Math.min(Math.max(0, 100 - (totalBazaarSpent / budgetTarget) * 100), (report.totalFixedCost / budgetTarget) * 100)}%` }}
-                    className={`h-full transition-all duration-500 ${isOverBudget ? 'bg-rose-400' : 'bg-indigo-500'}`}
+                    className={`h-full transition-all duration-500 ${isOverBudget ? 'bg-rose-300' : 'bg-indigo-400'}`}
                     title={`Shared Fixed Costs: ৳${report.totalFixedCost.toLocaleString('en-IN')}`}
                   />
                 </div>
 
                 {/* Sub-bar Breakdown Legend */}
-                <div className="flex flex-wrap items-center justify-between text-[10px] text-slate-500 mt-2 font-medium">
-                  <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1">
-                      <span className={`w-2 h-2 rounded-full ${isOverBudget ? 'bg-rose-500' : 'bg-blue-600'}`} />
+                <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-500 mt-2 font-medium gap-2">
+                  <div className="flex items-center gap-4 font-mono tabular-nums">
+                    <span className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-xs ${isOverBudget ? 'bg-rose-500' : 'bg-blue-600'}`} />
                       Bazaar: ৳{totalBazaarSpent.toLocaleString('en-IN')} ({((totalBazaarSpent / budgetTarget) * 100).toFixed(0)}%)
                     </span>
-                    <span className="flex items-center gap-1">
-                      <span className={`w-2 h-2 rounded-full ${isOverBudget ? 'bg-rose-400' : 'bg-indigo-500'}`} />
+                    <span className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-xs ${isOverBudget ? 'bg-rose-300' : 'bg-indigo-400'}`} />
                       Fixed Bills: ৳{report.totalFixedCost.toLocaleString('en-IN')} ({((report.totalFixedCost / budgetTarget) * 100).toFixed(0)}%)
                     </span>
                   </div>
-                  <span className="font-mono">
+                  <span className="font-mono tabular-nums">
                     {budgetSpentPct.toFixed(1)}% of ৳{budgetTarget.toLocaleString('en-IN')}
                   </span>
                 </div>
@@ -1298,40 +1285,40 @@ export default function ManagerDashboard({
       />
 
       {/* Navigation Sub-Tabs */}
-      <div className="border-b border-slate-200">
-        <nav className="flex flex-wrap items-center -mb-px gap-2">
+      <div className="border-b border-slate-200 overflow-x-auto">
+        <nav className="flex items-center -mb-px gap-1.5 min-w-max">
           
           <button
             onClick={() => setActiveTab('analytics')}
             id="tab-analytics"
-            className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-xs sm:text-sm cursor-pointer transition-colors ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 border-b-2 text-xs sm:text-sm cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
               activeTab === 'analytics'
-                ? 'border-blue-600 text-blue-600 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                ? 'border-blue-600 text-blue-700 font-semibold'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-medium'
             }`}
           >
-            <BarChart3 className="w-4 h-4 text-indigo-600" />
+            <BarChart3 className={`w-4 h-4 ${activeTab === 'analytics' ? 'text-blue-600' : 'text-slate-400'}`} />
             <span>Analytics & Trends</span>
           </button>
 
           <button
             onClick={() => setActiveTab('meals')}
             id="tab-meals"
-            className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-xs sm:text-sm cursor-pointer transition-colors ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 border-b-2 text-xs sm:text-sm cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
               activeTab === 'meals'
-                ? 'border-blue-600 text-blue-600 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                ? 'border-blue-600 text-blue-700 font-semibold'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-medium'
             }`}
           >
             <Utensils className="w-4 h-4" />
             <span>Daily Meals</span>
             {breakfastDefaultersCount > 0 && (
               <span 
-                className="bg-amber-100 text-amber-800 border border-amber-300 text-[10px] font-bold px-1.5 py-0.2 rounded-full flex items-center gap-1"
+                className="bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-semibold px-1.5 py-0.5 rounded-md flex items-center gap-1 font-mono tabular-nums leading-none"
                 title={`${breakfastDefaultersCount} boarder(s) below ${minBreakfastDays} days breakfast`}
               >
                 <Coffee className="w-2.5 h-2.5 text-amber-700" />
-                <span>{breakfastDefaultersCount} below 16d</span>
+                <span>{breakfastDefaultersCount} below {minBreakfastDays}d</span>
               </span>
             )}
           </button>
@@ -1339,57 +1326,57 @@ export default function ManagerDashboard({
           <button
             onClick={() => setActiveTab('bazaar')}
             id="tab-bazaar"
-            className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-xs sm:text-sm cursor-pointer transition-colors ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 border-b-2 text-xs sm:text-sm cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
               activeTab === 'bazaar'
-                ? 'border-blue-600 text-blue-600 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                ? 'border-blue-600 text-blue-700 font-semibold'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-medium'
             }`}
           >
             <ShoppingCart className="w-4 h-4" />
-            Bazaar Log
+            <span>Bazaar Log</span>
           </button>
 
           <button
             onClick={() => setActiveTab('deposits')}
             id="tab-deposits"
-            className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-xs sm:text-sm cursor-pointer transition-colors ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 border-b-2 text-xs sm:text-sm cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
               activeTab === 'deposits'
-                ? 'border-blue-600 text-blue-600 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                ? 'border-blue-600 text-blue-700 font-semibold'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-medium'
             }`}
           >
             <DollarSign className="w-4 h-4" />
-            Deposits
+            <span>Deposits</span>
           </button>
 
           <button
             onClick={() => setActiveTab('fixed')}
             id="tab-fixed"
-            className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-xs sm:text-sm cursor-pointer transition-colors ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 border-b-2 text-xs sm:text-sm cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
               activeTab === 'fixed'
-                ? 'border-blue-600 text-blue-600 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                ? 'border-blue-600 text-blue-700 font-semibold'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-medium'
             }`}
           >
             <Receipt className="w-4 h-4" />
-            Utility & Fixed Bills
+            <span>Utility & Fixed Bills</span>
           </button>
 
           <button
             onClick={() => setActiveTab('boarders')}
             id="tab-boarders"
-            className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium text-xs sm:text-sm cursor-pointer transition-colors ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 border-b-2 text-xs sm:text-sm cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
               activeTab === 'boarders'
-                ? 'border-blue-600 text-blue-600 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                ? 'border-blue-600 text-blue-700 font-semibold'
+                : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300 font-medium'
             }`}
           >
             <Users className="w-4 h-4" />
-            Boarder Profiles
+            <span>Boarder Profiles</span>
           </button>
 
           {/* Quick jump to audit feed button on tab strip */}
-          <div className="ml-auto pb-2 sm:pb-0">
+          <div className="ml-auto pl-2 pb-1.5 sm:pb-0 shrink-0">
             <button
               onClick={() => {
                 const el = document.getElementById('recent-activities-scroll-feed');
@@ -1398,10 +1385,10 @@ export default function ManagerDashboard({
                 }
               }}
               id="tab-quick-activities-jump"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-blue-700 bg-blue-50/80 hover:bg-blue-100 border border-blue-200/80 rounded-lg cursor-pointer transition-colors shadow-2xs"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
               title="Jump to Recent Activities audit trail"
             >
-              <Activity className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+              <Activity className="w-3.5 h-3.5 text-blue-600" />
               <span>Audit Feed</span>
             </button>
           </div>

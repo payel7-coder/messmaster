@@ -209,24 +209,25 @@ export default function RecentActivitiesSection({
     .reduce((sum, a) => sum + (a.totalMeals || 0), 0);
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden transition-all">
+    <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden transition-all">
       {/* Top Header / Bar */}
-      <div className="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-slate-50/80 via-white to-blue-50/30">
+      <div className="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-600/10 text-blue-700 flex items-center justify-center shrink-0 border border-blue-200/60">
-            <Activity className="w-5 h-5 text-blue-600 animate-pulse" />
+          <div className="w-9 h-9 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 border border-slate-200/80">
+            <Activity className="w-4 h-4 text-blue-600" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-extrabold text-slate-900 text-sm sm:text-base tracking-tight">
+              <h3 className="font-bold text-slate-900 text-sm sm:text-base tracking-tight">
                 Recent Activities
               </h3>
-              <span className="bg-blue-100 text-blue-800 text-[11px] font-bold px-2 py-0.5 rounded-full">
+              <span aria-hidden="true" className="text-slate-300">·</span>
+              <span className="text-xs font-mono text-slate-500 font-medium tabular-nums">
                 {activities.length} Events
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              Scrollable timestamped audit trail of latest deposits & meal logs
+              Timestamped audit trail of latest deposits & meal logs
             </p>
           </div>
         </div>
@@ -236,20 +237,20 @@ export default function RecentActivitiesSection({
           {/* Month scope toggle */}
           <button
             onClick={() => setScopeMonthOnly(!scopeMonthOnly)}
-            className={`text-xs font-semibold px-2.5 py-1.5 rounded-lg border cursor-pointer transition-colors ${
+            className={`text-xs font-semibold px-3 py-1.5 rounded-lg border cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
               scopeMonthOnly
                 ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
-                : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
             }`}
             title="Toggle between current billing month and all records"
           >
-            {scopeMonthOnly ? '📅 Active Month' : '🌐 All Records'}
+            {scopeMonthOnly ? 'Active Month Only' : 'All Records'}
           </button>
 
           {/* Minimize / Expand Toggle */}
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 px-2.5 py-1.5 rounded-lg border border-slate-200 cursor-pointer transition-colors"
+            className="flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200 cursor-pointer transition-colors whitespace-nowrap shrink-0"
             title={isExpanded ? 'Collapse Activities' : 'Expand Activities'}
             id="btn-toggle-recent-activities"
           >

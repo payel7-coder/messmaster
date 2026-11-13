@@ -118,42 +118,43 @@ export default function BoarderDashboard({
   return (
     <div className="space-y-6 animate-fadeIn text-slate-800">
       
-      {/* Welcome Banner */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 sm:p-8 text-white shadow-xs relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-5">
-        <div className="absolute inset-0 bg-linear-to-r from-blue-900/40 to-slate-900/10 pointer-events-none" />
-        <div className="relative z-10 max-w-2xl">
-          <span className="bg-blue-500/20 text-blue-300 font-semibold text-xs uppercase px-2.5 py-1 rounded-full border border-blue-500/30">
-            Boarder Console
-          </span>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mt-3">
-            Assalamu Alaikum, {boarder.name}!
-          </h2>
-          <p className="text-slate-300 text-sm mt-1.5 leading-relaxed">
-            Here is your personal meal statement, ledger, and share of bills for <span className="font-semibold text-white">{formatReadableMonth(report.month)}</span>.
-          </p>
-          <div className="flex flex-wrap items-center gap-3 mt-2 text-xs">
+      {/* Executive Boarder Statement Header */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 text-white flex flex-col md:flex-row md:items-center justify-between gap-5">
+        <div className="max-w-2xl">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 font-medium">
+            <span className="text-blue-400 font-semibold">Boarder Statement</span>
+            <span aria-hidden="true">·</span>
+            <span>{formatReadableMonth(report.month)}</span>
             {boarder.roomNo && (
-              <span className="bg-blue-600/30 text-blue-200 border border-blue-400/30 px-2 py-0.5 rounded font-mono font-medium">
-                Room: {boarder.roomNo}
-              </span>
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="font-mono text-slate-300">Room {boarder.roomNo}</span>
+              </>
             )}
             {boarder.phone && (
-              <span className="text-slate-400 font-mono">
-                Contact: {boarder.phone}
-              </span>
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="font-mono text-slate-400">{boarder.phone}</span>
+              </>
             )}
           </div>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight mt-2 text-white">
+            Assalamu Alaikum, {boarder.name}
+          </h2>
+          <p className="text-slate-300 text-sm mt-1.5 leading-relaxed">
+            Personal meal consumption, itemized utility share, and closing balance for <span className="font-semibold text-white">{formatReadableMonth(report.month)}</span>.
+          </p>
         </div>
 
-        <div className="relative z-10 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
           <button
             type="button"
             onClick={() => setShowSlipModal(true)}
             id="btn-boarder-view-slip"
-            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs px-4 py-3 rounded-xl cursor-pointer transition-all shadow-md shadow-blue-950/40 active:scale-98"
+            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl cursor-pointer transition-colors whitespace-nowrap shrink-0"
           >
             <Receipt className="w-4 h-4" />
-            <span>View & Download My Voucher Slip</span>
+            <span>View & Download Voucher Slip</span>
           </button>
         </div>
       </div>
@@ -162,106 +163,91 @@ export default function BoarderDashboard({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* Total Deposits Card */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-blue-50/50 rounded-bl-full -mr-4 -mt-4 transition-all group-hover:scale-105 duration-300" />
-          <div className="relative z-10">
-            <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-700 mb-4">
-              <DollarSign className="w-5 h-5" />
-            </div>
+        <div className="bg-white p-5 rounded-xl border border-slate-200/90">
+          <div className="flex items-center justify-between mb-3">
             <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Your Deposits</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">
-              ৳ {summary.totalDeposit.toLocaleString('en-IN')}
-            </h3>
-            <p className="text-xs text-blue-600 font-medium flex items-center gap-1 mt-2">
-              <ArrowUpRight className="w-3.5 h-3.5" />
-              <span>Paid this month</span>
-            </p>
+            <DollarSign className="w-4 h-4 text-blue-600" />
           </div>
+          <h3 className="text-2xl font-bold text-slate-900 font-mono tabular-nums">
+            ৳ {summary.totalDeposit.toLocaleString('en-IN')}
+          </h3>
+          <p className="text-xs text-slate-500 font-medium mt-1.5">
+            Cash & digital deposits logged
+          </p>
         </div>
 
         {/* Total Meals Eaten Card */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-slate-50 rounded-bl-full -mr-4 -mt-4 transition-all group-hover:scale-105 duration-300" />
-          <div className="relative z-10">
-            <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 mb-4">
-              <Utensils className="w-5 h-5" />
-            </div>
+        <div className="bg-white p-5 rounded-xl border border-slate-200/90">
+          <div className="flex items-center justify-between mb-3">
             <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Meals</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">
-              {summary.totalMeals} <span className="text-xs text-slate-400 font-normal">meals</span>
-            </h3>
-            <p className="text-xs text-slate-500 font-medium flex items-center gap-1 mt-2">
-              <Activity className="w-3.5 h-3.5" />
-              <span>Active meal counter</span>
-            </p>
+            <Utensils className="w-4 h-4 text-slate-600" />
           </div>
+          <h3 className="text-2xl font-bold text-slate-900 font-mono tabular-nums">
+            {summary.totalMeals} <span className="text-xs text-slate-400 font-sans font-normal">meals</span>
+          </h3>
+          <p className="text-xs text-slate-500 font-medium mt-1.5 font-mono tabular-nums">
+            Active rate: ৳{report.mealRate.toFixed(2)} / meal
+          </p>
         </div>
 
         {/* Total Expenses / Cost Card */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-slate-50 rounded-bl-full -mr-4 -mt-4 transition-all group-hover:scale-105 duration-300" />
-          <div className="relative z-10">
-            <div className="w-10 h-10 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 mb-4">
-              <FileText className="w-5 h-5" />
-            </div>
-            <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Bills</p>
-            <h3 className="text-2xl font-bold text-slate-900 mt-1">
-              ৳ {summary.totalCost.toLocaleString('en-IN')}
-            </h3>
-            <p className="text-xs text-slate-400 font-medium flex items-center gap-1 mt-2">
-              <span>
-                Meals: ৳{summary.mealCost} + Bills: ৳{summary.fixedCostShare}
-                {hasSpecialMeal && ` + Feast: ৳${(summary.specialMealCost || 0).toFixed(2)}`}
-              </span>
-            </p>
+        <div className="bg-white p-5 rounded-xl border border-slate-200/90">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Total Charged</p>
+            <FileText className="w-4 h-4 text-slate-600" />
           </div>
+          <h3 className="text-2xl font-bold text-slate-900 font-mono tabular-nums">
+            ৳ {summary.totalCost.toLocaleString('en-IN')}
+          </h3>
+          <p className="text-xs text-slate-500 font-medium mt-1.5 font-mono tabular-nums truncate">
+            Meals ৳{summary.mealCost.toFixed(0)} · Bills ৳{summary.fixedCostShare.toFixed(0)}
+            {hasSpecialMeal && ` · Feast ৳${(summary.specialMealCost || 0).toFixed(0)}`}
+          </p>
         </div>
 
         {/* Current Balance Card */}
-        <div className={`p-5 rounded-xl border shadow-xs relative overflow-hidden group ${
+        <div className={`p-5 rounded-xl border ${
           summary.balance >= 0 
-            ? 'bg-blue-50/30 border-blue-100' 
-            : 'bg-rose-50/40 border-rose-100'
+            ? 'bg-emerald-50/40 border-emerald-200' 
+            : 'bg-rose-50/40 border-rose-200'
         }`}>
-          <div className="relative z-10">
-            <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-4 ${
-              summary.balance >= 0 ? 'bg-blue-100/80 text-blue-700' : 'bg-rose-100/80 text-rose-700'
-            }`}>
-              {summary.balance >= 0 ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
-            </div>
-            <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Net Statement</p>
-            <h3 className={`text-2xl font-bold mt-1 ${
-              summary.balance >= 0 ? 'text-blue-700' : 'text-rose-700'
-            }`}>
-              ৳ {Math.abs(summary.balance).toLocaleString('en-IN')}
-            </h3>
-            <p className="text-xs font-semibold flex items-center gap-1 mt-2">
-              {summary.balance >= 0 ? (
-                <span className="text-blue-700">Surplus (Receivable)</span>
-              ) : (
-                <span className="text-rose-700">Due (Payable Immediately)</span>
-              )}
-            </p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-slate-600 font-semibold uppercase tracking-wider">Net Statement</p>
+            {summary.balance >= 0 ? (
+              <ArrowUpRight className="w-4 h-4 text-emerald-700" />
+            ) : (
+              <ArrowDownRight className="w-4 h-4 text-rose-700" />
+            )}
           </div>
+          <h3 className={`text-2xl font-bold font-mono tabular-nums ${
+            summary.balance >= 0 ? 'text-emerald-700' : 'text-rose-700'
+          }`}>
+            {summary.balance >= 0 ? '+' : '-'}৳ {Math.abs(summary.balance).toLocaleString('en-IN')}
+          </h3>
+          <p className={`text-xs font-semibold mt-1.5 ${
+            summary.balance >= 0 ? 'text-emerald-700' : 'text-rose-700'
+          }`}>
+            {summary.balance >= 0 ? 'Surplus (Refundable)' : 'Due (Payable Now)'}
+          </p>
         </div>
 
       </div>
 
       {/* Financial Health Progress Block */}
       {summary.totalDeposit > 0 && (
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+        <div className="bg-white p-5 rounded-xl border border-slate-200/90">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
             <div>
-              <h4 className="text-sm font-semibold text-slate-800">Deposit Consumption</h4>
-              <p className="text-xs text-slate-500">How much of your deposited Taka has been consumed by costs</p>
+              <h4 className="text-sm font-semibold text-slate-900">Deposit Utilization</h4>
+              <p className="text-xs text-slate-500">Share of your advance deposit consumed by month-to-date charges</p>
             </div>
-            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-              budgetUtilization > 90 ? 'bg-rose-100 text-rose-800' : 'bg-blue-50 text-blue-800'
+            <span className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded-md ${
+              budgetUtilization > 90 ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-800'
             }`}>
-              {budgetUtilization}% Spent
+              {budgetUtilization}% Utilized
             </span>
           </div>
-          <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+          <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
             <div 
               className={`h-full rounded-full transition-all duration-500 ${
                 budgetUtilization > 90 ? 'bg-rose-600' : budgetUtilization > 75 ? 'bg-amber-500' : 'bg-blue-600'
@@ -270,19 +256,19 @@ export default function BoarderDashboard({
             />
           </div>
           {summary.balance < 0 && (
-            <div className="flex items-start gap-1.5 mt-3 text-xs text-rose-700 bg-rose-50 p-2.5 rounded-lg border border-rose-100">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>You have exceeded your deposited amount by <strong>৳ {Math.abs(summary.balance)}</strong>. Please deposit cash to clear your dues.</span>
+            <div className="flex items-start gap-2 mt-3 text-xs text-rose-800 bg-rose-50/70 p-3 rounded-lg border border-rose-200">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+              <span>Your charges exceed your deposit by <strong className="font-mono">৳ {Math.abs(summary.balance).toLocaleString('en-IN')}</strong>. Please settle this balance with the manager.</span>
             </div>
           )}
         </div>
       )}
 
       {/* Breakfast Attendance Rule (16 Days Minimum) Card */}
-      <div className={`p-5 rounded-xl border shadow-xs ${
+      <div className={`p-5 rounded-xl border ${
         isBreakfastShort 
-          ? 'bg-amber-50/40 border-amber-200' 
-          : 'bg-emerald-50/30 border-emerald-200'
+          ? 'bg-amber-50/30 border-amber-200' 
+          : 'bg-white border-slate-200/90'
       }`}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2.5">
@@ -292,20 +278,20 @@ export default function BoarderDashboard({
               <Coffee className="w-4 h-4" />
             </div>
             <div>
-              <h4 className="text-sm font-bold text-slate-800">
-                Breakfast Attendance (Minimum {minBreakfastDays} Days Rule)
+              <h4 className="text-sm font-bold text-slate-900">
+                Breakfast Attendance (Minimum {minBreakfastDays} Days)
               </h4>
               <p className="text-xs text-slate-500">
-                Mess rule requires every member to eat breakfast on at least {minBreakfastDays} days monthly
+                Mess rule requires eating breakfast on at least {minBreakfastDays} days per month
               </p>
             </div>
           </div>
-          <span className={`text-xs font-bold px-2.5 py-1 rounded-full border self-start sm:self-auto ${
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-md border self-start sm:self-auto ${
             isBreakfastShort 
-              ? 'bg-rose-100 text-rose-800 border-rose-300' 
-              : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+              ? 'bg-rose-50 text-rose-800 border-rose-200' 
+              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
           }`}>
-            {isBreakfastShort ? `${breakfastShortfall} Days Short of Rule` : `Rule Met (${myBreakfastDays} Days)`}
+            {isBreakfastShort ? `${breakfastShortfall} Days Short` : `Compliant (${myBreakfastDays} Days)`}
           </span>
         </div>
 

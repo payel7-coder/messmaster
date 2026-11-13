@@ -771,98 +771,93 @@ export default function App() {
       {/* Main Core Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 print:py-0 print:px-0">
         
-        {/* Navigation Tabs Bar */}
-        <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border-b border-gray-200 pb-3">
+        {/* Workspace Sub-Navigation Strip */}
+        <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border-b border-slate-200/90">
           
-          {/* Section Selector Tab Navs */}
-          <div className="flex bg-slate-100 p-1 rounded-xl overflow-x-auto">
+          {/* Primary Workspace Views */}
+          <nav className="flex items-center gap-1 overflow-x-auto -mb-px">
             <button
               onClick={() => setActiveTab('dashboard')}
               id="nav-tab-dashboard"
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-2 px-4 py-3 border-b-2 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'dashboard'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
               }`}
             >
-              <LayoutDashboard className="w-4 h-4 text-blue-600" />
-              {role === 'manager' ? 'Manager Console' : 'My Dashboard (Public)'}
+              <LayoutDashboard className="w-4 h-4" />
+              <span>{role === 'manager' ? 'Manager Console' : 'My Statement'}</span>
             </button>
             
-            {/* Analytics & Trends is strictly for Manager Mode */}
             {role === 'manager' && (
               <button
                 onClick={() => setActiveTab('analytics')}
                 id="nav-tab-analytics"
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-3 border-b-2 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                   activeTab === 'analytics'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
                 }`}
               >
-                <BarChart3 className="w-4 h-4 text-blue-600" />
-                Analytics & Trends
+                <BarChart3 className="w-4 h-4" />
+                <span>Analytics & Trends</span>
               </button>
             )}
 
-            {/* Month-End Bills & Memos is strictly restricted to Manager Mode */}
             {role === 'manager' && (
               <button
                 onClick={() => setActiveTab('report')}
                 id="nav-tab-report"
-                className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 py-3 border-b-2 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                   activeTab === 'report'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
                 }`}
               >
-                <ReceiptText className="w-4 h-4 text-blue-600" />
-                Month-End Bills & Memos
+                <ReceiptText className="w-4 h-4" />
+                <span>Month-End Bills & Memos</span>
               </button>
             )}
 
             <button
               onClick={() => setActiveTab('settings')}
               id="nav-tab-settings"
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-2 px-4 py-3 border-b-2 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'settings'
-                  ? 'bg-white text-slate-900 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-800'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
               }`}
             >
-              <Settings className="w-4 h-4 text-blue-600" />
-              Settings
+              <Settings className="w-4 h-4" />
+              <span>Settings</span>
             </button>
-          </div>
+          </nav>
 
-          {/* Cloud Firestore Status Indicator & Actions - Strictly for Manager Mode */}
+          {/* Cloud Firestore Status Control */}
           {role === 'manager' && isManagerAuthenticated && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 pb-2.5 sm:pb-0 shrink-0">
               <button
                 onClick={() => setShowCloudModal(true)}
                 id="btn-cloud-sync-status"
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer shadow-2xs hover:shadow-sm ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                   isCloudSynced 
-                    ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-300' 
-                    : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+                    ? 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200' 
+                    : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
                 }`}
-                title="Click to view Google Cloud Firestore status, purge browser cache, or force refresh"
+                title="View Google Cloud Firestore sync status or force refresh"
               >
-                <Cloud className={`w-3.5 h-3.5 ${isCloudSynced ? 'text-emerald-600' : 'text-amber-600'} ${isCloudLoading ? 'animate-pulse' : ''}`} />
-                <span className="hidden sm:inline font-bold">Cloud:</span>
-                <span className="font-extrabold">{isCloudLoading ? 'Syncing...' : isCloudSynced ? 'Live Firestore' : 'Offline Cache'}</span>
-                <span className={`w-2 h-2 rounded-full ${isCloudSynced ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                <Cloud className={`w-3.5 h-3.5 ${isCloudSynced ? 'text-emerald-600' : 'text-amber-600'}`} />
+                <span className="font-semibold">{isCloudLoading ? 'Syncing…' : isCloudSynced ? 'Firestore Synced' : 'Offline Cache'}</span>
               </button>
 
-              {/* Quick Simulation Badge (Manager only) */}
               {!hasActiveMonthData && (
                 <button
                   onClick={handleSimulateData}
                   id="btn-quick-simulation"
-                  className="hidden sm:flex items-center gap-1.5 text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100 px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                  className="hidden sm:flex items-center gap-1.5 text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 px-3 py-1.5 rounded-lg transition-colors cursor-pointer whitespace-nowrap shrink-0"
                 >
-                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                  Populate Demo Data
+                  <Database className="w-3.5 h-3.5" />
+                  <span>Load Sample Data</span>
                 </button>
               )}
             </div>
@@ -1619,9 +1614,8 @@ export default function App() {
             <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
           )}
           <div className="flex-1 text-xs">
-            <div className="font-bold flex items-center gap-1.5">
-              <span>{cloudToast.type === 'success' ? 'Google Cloud Firestore' : 'Sync Status'}</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <div className="font-bold">
+              {cloudToast.type === 'success' ? 'Google Cloud Firestore' : 'Sync Status'}
             </div>
             <div className="text-slate-300 mt-0.5 leading-relaxed">{cloudToast.message}</div>
           </div>
@@ -1636,8 +1630,8 @@ export default function App() {
       )}
 
       {/* Footer (Hidden on print) */}
-      <footer className="bg-white border-t border-gray-100 py-4 text-center text-xs text-gray-400 mt-12 print:hidden">
-        <p>© 2026 {settings.messName || 'Mess Meal Manager'}. Operationalized for seamless meal accountability.</p>
+      <footer className="bg-white border-t border-slate-200/80 py-5 text-center text-xs text-slate-500 mt-12 print:hidden">
+        <p>© 2026 {settings.messName || 'MessMaster'}. Operationalized for transparent meal & ledger accounting.</p>
       </footer>
 
       {/* Manager Login Modal */}

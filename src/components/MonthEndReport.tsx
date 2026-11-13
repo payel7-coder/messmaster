@@ -167,20 +167,20 @@ export default function MonthEndReport({
       </div>
 
       {/* Main Control Hub */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-xs p-5 print:hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 print:hidden flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-            <TrendingUp className="w-4.5 h-4.5 text-blue-600" />
-            Audit & Calculations Hub
+          <h3 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-blue-600" />
+            <span>Audit & Month-End Calculations Hub</span>
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
             {isManager 
-              ? "Generate physical invoice slips, export PDF reports, print monthly tables, or backup mess data."
+              ? "Generate physical invoice slips, export vector PDF reports, or backup mess data."
               : "Review month-end calculations, meal costs, and shared bill balances."}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           {/* ONLY MANAGERS CAN SEE MEAL SHEET PDF, MONTHLY AUDIT PDF, AND DIRECT PRINT OPTIONS */}
           {isManager ? (
             <>
@@ -189,10 +189,10 @@ export default function MonthEndReport({
                   type="button"
                   onClick={onOpenHandoverModal}
                   id="btn-close-month-handover"
-                  className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-all shadow-xs"
+                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
                   title="Finalize monthly calculations, settle balances, and handover to new incoming manager"
                 >
-                  <ArrowRightLeft className="w-4 h-4 text-emerald-100" />
+                  <ArrowRightLeft className="w-3.5 h-3.5" />
                   <span>Close Month & Handover</span>
                 </button>
               )}
@@ -200,40 +200,40 @@ export default function MonthEndReport({
               <button
                 onClick={() => setShowMealSheetModal(true)}
                 id="btn-generate-meal-sheet-modal"
-                className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors shadow-2xs"
+                className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
                 title="Generate & export the full monthly 31-day meal sheet of all boarders"
               >
-                <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-                Meal Sheet PDF
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Meal Sheet PDF</span>
               </button>
 
               <button
                 onClick={() => setShowPdfModal(true)}
                 id="btn-generate-pdf-modal"
-                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors shadow-xs shadow-blue-200"
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
               >
-                <FileText className="w-4 h-4" />
-                Monthly Audit PDF
+                <FileText className="w-3.5 h-3.5" />
+                <span>Monthly Audit PDF</span>
               </button>
 
               <button
                 onClick={handleDownloadReportPdf}
                 disabled={isDownloadingPdf}
                 id="btn-download-pdf-direct"
-                className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors shadow-2xs disabled:opacity-50"
+                className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
                 title="Directly download monthly audit PDF report with 4 vouchers per page"
               >
-                <Download className="w-4 h-4 text-emerald-200" />
-                <span>{isDownloadingPdf ? 'Downloading...' : 'Download PDF'}</span>
+                <Download className="w-3.5 h-3.5 text-blue-600" />
+                <span>{isDownloadingPdf ? 'Downloading…' : 'Download PDF'}</span>
               </button>
 
               <button
                 onClick={handleExportBackup}
                 id="btn-export-json"
-                className="flex items-center gap-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors shadow-2xs"
+                className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
               >
-                <Download className="w-4 h-4 text-slate-500" />
-                Backup JSON
+                <Download className="w-3.5 h-3.5 text-slate-500" />
+                <span>Backup JSON</span>
               </button>
 
               <button
@@ -241,11 +241,11 @@ export default function MonthEndReport({
                   fileInputRef.current?.click();
                 }}
                 id="btn-import-json"
-                className="flex items-center gap-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors shadow-2xs"
+                className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
                 title="Restore database backup from JSON file"
               >
-                <Upload className="w-4 h-4 text-slate-500" />
-                Restore Backup
+                <Upload className="w-3.5 h-3.5 text-slate-500" />
+                <span>Restore</span>
               </button>
               <input
                 type="file"
@@ -255,31 +255,28 @@ export default function MonthEndReport({
                 className="hidden"
               />
 
-              <div className="h-5 w-[1px] bg-slate-200 mx-1 hidden md:block" />
-
               <button
                 onClick={onClearData}
                 id="btn-clear-month"
-                className="flex items-center gap-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors border border-rose-200"
+                className="flex items-center gap-1.5 bg-white hover:bg-rose-50 text-rose-700 font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors border border-rose-200 whitespace-nowrap shrink-0"
                 title="Wipe data from Google Cloud Firestore and local storage"
               >
-                <Trash2 className="w-4 h-4 text-rose-600" />
-                <span>Wipe Data</span>
+                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                <span>Wipe</span>
               </button>
             </>
           ) : (
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                Boarder Public View
+              <span className="text-xs font-medium text-slate-600 px-2.5 py-1">
+                Public Read-Only View
               </span>
               <button
                 onClick={onRequireManagerLogin}
-                className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
                 title="Manager login required for PDF exports, print, and administrative tools"
               >
-                <Lock className="w-3.5 h-3.5 text-blue-600" />
-                Manager PDF & Print
+                <Lock className="w-3.5 h-3.5 text-white" />
+                <span>Manager PDF & Print</span>
               </button>
             </div>
           )}
@@ -639,7 +636,7 @@ export default function MonthEndReport({
                 Archived records of finalized months, outgoing managers, and cash transitions.
               </p>
             </div>
-            <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200">
+            <span className="text-xs font-mono text-slate-500">
               {settings.closureHistory.length} Month{settings.closureHistory.length > 1 ? 's' : ''} Archived
             </span>
           </div>
