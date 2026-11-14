@@ -1,4 +1,4 @@
-import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, BoarderSummary, SpecialMeal } from './types';
+import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, BoarderSummary, SpecialMeal, MealBreakdown } from './types';
 
 /**
  * Checks if a YYYY-MM-DD date string belongs to the active YYYY-MM month.
@@ -207,3 +207,69 @@ export function formatReadableMonth(yearMonth: string): string {
     return yearMonth;
   }
 }
+
+/**
+ * Resolves a boarder's slot breakdown (breakfast, lunch, dinner) for a day.
+ * Uses explicit `mealBreakdown` when available, and gracefully infers slots for legacy numeric logs.
+ */
+export function getBoarderMealBreakdown(log: DailyMealLog | undefined, boarderId: string): MealBreakdown {
+  const explicit = log?.mealBreakdown?.[boarderId];
+  if (explicit) {
+    return {
+      breakfast: Math.max(0, Number(explicit.breakfast) || 0),
+      lunch: Math.max(0, Number(explicit.lunch) || 0),
+      dinner: Math.max(0, Number(explicit.dinner) || 0),
+    };
+  }
+
+  const total = Math.max(0, Number(log?.meals?.[boarderId]) || 0);
+  if (total === 0) {
+    return { breakfast: 0, lunch: 0, dinner: 0 };
+  }
+
+  const rem = Number((total % 1).toFixed(2));
+  const hasHalf = rem >= 0.45 && rem <= 0.55;
+  const breakfast = hasHalf ? 0.5 : 0;
+  const remaining = Number((total - breakfast).toFixed(2));
+  const lunch = remaining >= 1 ? 1 : remaining;
+  const dinner = Number(Math.max(0, remaining - lunch).toFixed(2));
+
+  return { breakfast, lunch, dinner };
+}
+
+/**
+ * Determines whether a boarder ate breakfast on a given daily log.
+ * Checks explicit `mealBreakdown[boarderId].breakfast > 0` first (supports 2+ breakfasts such as 1.0),
+ * falling back to the legacy `.5` remainder rule for older logs without slot breakdown.
+ */
+export function didBoarderEatBreakfast(log: DailyMealLog | undefined, boarderId: string): boolean {
+  if (!log) return false;
+
+  const explicit = log.mealBreakdown?.[boarderId];
+  if (explicit !== undefined) {
+    return (Number(explicit.breakfast) || 0) > 0;
+  }
+
+  const mealCount = Number(log.meals?.[boarderId]) || 0;
+  if (mealCount <= 0) return false;
+  const rem = Number((mealCount % 1).toFixed(2));
+  return rem >= 0.45 && rem <= 0.55;
+}
+
+/**
+ * Returns the breakfast meal units for a boarder on a given day (e.g., 0, 0.5, 1.0 for 2x breakfast).
+ */
+export function getBreakfastMealCount(log: DailyMealLog | undefined, boarderId: string): number {
+  if (!log) return 0;
+
+  const explicit = log.mealBreakdown?.[boarderId];
+  if (explicit !== undefined) {
+    return Math.max(0, Number(explicit.breakfast) || 0);
+  }
+
+  const mealCount = Number(log.meals?.[boarderId]) || 0;
+  if (mealCount <= 0) return 0;
+  const rem = Number((mealCount % 1).toFixed(2));
+  return rem >= 0.45 && rem <= 0.55 ? 0.5 : 0;
+}
+

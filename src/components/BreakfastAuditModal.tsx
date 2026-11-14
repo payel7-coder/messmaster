@@ -20,7 +20,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { Boarder, DailyMealLog, MessSettings, BreakfastFineRecord } from '../types';
-import { formatReadableDate, formatReadableMonth, getDatesInMonth } from '../utils';
+import { formatReadableDate, formatReadableMonth, getDatesInMonth, didBoarderEatBreakfast, getBreakfastMealCount, getBoarderMealBreakdown } from '../utils';
 import { syncMealLogToFirestore, syncSettingsToFirestore } from '../services/firestoreService';
 
 interface BreakfastAuditModalProps {
@@ -80,27 +80,18 @@ export default function BreakfastAuditModal({
     return (settings.breakfastFines || []).filter(f => f.month === currentMonth);
   }, [settings.breakfastFines, currentMonth]);
 
-  // Helper to check if a meal count on a day included breakfast
-  // Standard convention: Breakfast = 0.5, Lunch = 1.0, Dinner = 1.0 -> Breakfast included when meals % 1 === 0.5 or meals === 0.5
-  const hasBreakfast = (mealCount: number | undefined): boolean => {
-    if (!mealCount || mealCount <= 0) return false;
-    const rem = Number((mealCount % 1).toFixed(2));
-    return rem >= 0.45 && rem <= 0.55;
-  };
-
   // Compute breakfast attendance for each active boarder
   const auditData = useMemo(() => {
     const activeBoarders = boarders.filter(b => b.isActive);
 
     return activeBoarders.map(boarder => {
-      // Find days breakfast was taken
+      // Find days breakfast was taken (supports both slot-level 2x breakfast = 1.0 and legacy .5 rule)
       const attendedDates: string[] = [];
       const skippedDates: string[] = [];
 
       datesInMonth.forEach(dateStr => {
         const log = monthMealLogs.find(l => l.date === dateStr);
-        const mealCount = log?.meals[boarder.id] || 0;
-        if (hasBreakfast(mealCount)) {
+        if (didBoarderEatBreakfast(log, boarder.id)) {
           attendedDates.push(dateStr);
         } else {
           skippedDates.push(dateStr);
@@ -209,9 +200,13 @@ export default function BreakfastAuditModal({
       note: `Breakfast shortfall fine (${item.breakfastDays}/${minRequiredDays} days, ${item.shortfallDays} days short)`
     };
 
-    // 2. Update meal log on fineDate
+    // 2. Update meal log on fineDate while preserving slot breakdown so a penalty never alters breakfast attendance
     const existingLog = mealLogs.find(l => l.date === fineDate);
     const prevMeals = existingLog ? { ...existingLog.meals } : {};
+    const prevBreakdown = existingLog?.mealBreakdown ? { ...existingLog.mealBreakdown } : {};
+    if (!prevBreakdown[item.boarder.id]) {
+      prevBreakdown[item.boarder.id] = getBoarderMealBreakdown(existingLog, item.boarder.id);
+    }
     const currentBoarderMeals = prevMeals[item.boarder.id] || 0;
     const updatedBoarderMeals = Number((currentBoarderMeals + fineAmount).toFixed(2));
     const updatedMeals = { ...prevMeals, [item.boarder.id]: updatedBoarderMeals };
@@ -225,6 +220,7 @@ export default function BreakfastAuditModal({
     const updatedLog: DailyMealLog = {
       date: fineDate,
       meals: updatedMeals,
+      mealBreakdown: prevBreakdown,
       note: updatedNote,
       updatedAt: nowIso
     };
@@ -274,9 +270,10 @@ export default function BreakfastAuditModal({
     const fineDate = selectedTargetDate;
     const nowIso = new Date().toISOString();
 
-    // Work on target day log
+    // Work on target day log while preserving slot breakdown
     const existingLog = mealLogs.find(l => l.date === fineDate);
     const updatedMeals = existingLog ? { ...existingLog.meals } : {};
+    const updatedBreakdown = existingLog?.mealBreakdown ? { ...existingLog.mealBreakdown } : {};
     const fineTags: string[] = [];
 
     const newFineRecords: BreakfastFineRecord[] = [];
@@ -287,6 +284,9 @@ export default function BreakfastAuditModal({
         : item.recommendedFineMeals;
 
       if (fineAmount > 0) {
+        if (!updatedBreakdown[item.boarder.id]) {
+          updatedBreakdown[item.boarder.id] = getBoarderMealBreakdown(existingLog, item.boarder.id);
+        }
         const cur = updatedMeals[item.boarder.id] || 0;
         updatedMeals[item.boarder.id] = Number((cur + fineAmount).toFixed(2));
         fineTags.push(`+${fineAmount}m (${item.boarder.name})`);
@@ -313,6 +313,7 @@ export default function BreakfastAuditModal({
     const updatedLog: DailyMealLog = {
       date: fineDate,
       meals: updatedMeals,
+      mealBreakdown: updatedBreakdown,
       note: updatedNote,
       updatedAt: nowIso
     };
@@ -840,19 +841,30 @@ export default function BreakfastAuditModal({
                             const didEat = item.attendedDates.includes(dateStr);
                             const dayLog = monthMealLogs.find(l => l.date === dateStr);
                             const count = dayLog?.meals[item.boarder.id] || 0;
+                            const bCount = getBreakfastMealCount(dayLog, item.boarder.id);
+                            const bServings = Math.round((bCount / 0.5) * 10) / 10;
+                            const explicit = dayLog?.mealBreakdown?.[item.boarder.id];
+                            const breakdownDesc = explicit
+                              ? `B:${explicit.breakfast}${bServings >= 2 ? ` (${bServings}x)` : ''}, L:${explicit.lunch}, D:${explicit.dinner}`
+                              : didEat ? 'Breakfast Included' : 'No Breakfast';
 
                             return (
                               <div
                                 key={dateStr}
-                                title={`${formatReadableDate(dateStr)}: ${count} meals logged ${didEat ? '(Breakfast Included)' : '(No Breakfast)'}`}
+                                title={`${formatReadableDate(dateStr)}: ${count} meals logged (${breakdownDesc})`}
                                 className={`p-1.5 rounded-lg border text-center transition-all ${
                                   didEat
                                     ? 'bg-emerald-50 border-emerald-200 text-emerald-800 font-bold shadow-2xs'
                                     : 'bg-white border-slate-200 text-slate-400 font-normal'
                                 }`}
                               >
-                                <div className="text-[9px] uppercase font-mono">{dayNum}</div>
-                                <div className="text-[10px] font-bold mt-0.5">
+                                <div className="text-[9px] uppercase font-mono flex items-center justify-center gap-0.5">
+                                  <span>{dayNum}</span>
+                                  {bServings >= 2 && (
+                                    <span className="text-[8px] text-amber-700 font-bold">{bServings}x</span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] font-bold mt-0.5 font-mono tabular-nums">
                                   {count > 0 ? `${count}m` : '-'}
                                 </div>
                               </div>
@@ -872,10 +884,10 @@ export default function BreakfastAuditModal({
           <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 flex items-start gap-2.5 text-xs text-slate-500">
             <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-slate-700">How Meal Fines Work in Mess Master:</p>
+              <p className="font-semibold text-slate-700">How Meal Fines & Breakfast Detection Work:</p>
               <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                Standard daily meal allocation: Breakfast = 0.5 meal, Lunch = 1.0 meal, Dinner = 1.0 meal. Any day where meals include a 0.5 fraction (0.5, 1.5, 2.5) counts as breakfast eaten.
-                When you click <strong>Apply Fine</strong>, the penalty meals are added to that boarder's record on the selected target date (e.g. month-end), which updates their total monthly meals and calculates their billing balance automatically.
+                Standard daily meal allocation: Breakfast = 0.5 meal per serving (e.g., 1.0 = 2x breakfast), Lunch = 1.0 meal, Dinner = 1.0 meal. Days with Breakfast slot &gt; 0 (including 2+ breakfasts such as 1.0) or legacy .5 totals count toward the monthly minimum.
+                When you click <strong>Apply Fine</strong>, the penalty meals are added to that boarder's record on the selected target date while preserving breakfast attendance history.
               </p>
             </div>
           </div>

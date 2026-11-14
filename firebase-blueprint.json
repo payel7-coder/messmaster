@@ -48,6 +48,7 @@
       "properties": {
         "date": { "type": "string" },
         "meals": { "type": "object" },
+        "mealBreakdown": { "type": "object" },
         "note": { "type": "string" },
         "updatedAt": { "type": "string" }
       },

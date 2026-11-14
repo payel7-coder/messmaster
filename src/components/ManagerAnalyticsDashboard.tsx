@@ -29,7 +29,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, BoarderSummary, SpecialMeal } from '../types';
-import { formatReadableDate, formatReadableMonth } from '../utils';
+import { formatReadableDate, formatReadableMonth, didBoarderEatBreakfast } from '../utils';
 
 interface ManagerAnalyticsDashboardProps {
   boarders: Boarder[];
@@ -212,10 +212,7 @@ export default function ManagerAnalyticsDashboard({
   const minBreakfastDays = settings.minBreakfastDays || 16;
   const breakfastDefaulters = useMemo(() => {
     return activeBoarders.filter(b => {
-      const bDays = currentMonthLogs.filter(l => {
-        const m = l.meals[b.id] || 0;
-        return (m % 1 >= 0.45 && m % 1 <= 0.55) || m === 0.5;
-      }).length;
+      const bDays = currentMonthLogs.filter(l => didBoarderEatBreakfast(l, b.id)).length;
       return bDays < minBreakfastDays;
     });
   }, [activeBoarders, currentMonthLogs, minBreakfastDays]);

@@ -24,7 +24,7 @@ import {
   UtensilsCrossed
 } from 'lucide-react';
 import { Boarder, Deposit, DailyMealLog, MonthReport, BoarderSummary, MessSettings, BazaarCost, MiscellaneousCosts } from '../types';
-import { formatReadableDate, formatReadableMonth } from '../utils';
+import { formatReadableDate, formatReadableMonth, didBoarderEatBreakfast } from '../utils';
 
 interface BoarderDashboardProps {
   boarder: Boarder;
@@ -92,6 +92,8 @@ export default function BoarderDashboard({
     .map(log => ({
       date: log.date,
       count: log.meals[boarder.id] || 0,
+      breakdown: log.mealBreakdown?.[boarder.id],
+      ateBreakfast: didBoarderEatBreakfast(log, boarder.id),
       note: log.note,
     }))
     .sort((a, b) => b.date.localeCompare(a.date));
@@ -103,10 +105,7 @@ export default function BoarderDashboard({
 
   // Minimum breakfast rule check (default 16 days)
   const minBreakfastDays = settings?.minBreakfastDays || 16;
-  const myBreakfastDays = myMealLogs.filter(m => {
-    const c = m.count;
-    return (c % 1 >= 0.45 && c % 1 <= 0.55) || c === 0.5;
-  }).length;
+  const myBreakfastDays = myMealLogs.filter(m => m.ateBreakfast).length;
   const breakfastShortfall = Math.max(0, minBreakfastDays - myBreakfastDays);
   const isBreakfastShort = myBreakfastDays < minBreakfastDays;
   const breakfastPct = Math.min(100, Math.round((myBreakfastDays / minBreakfastDays) * 100));
@@ -552,18 +551,25 @@ export default function BoarderDashboard({
             ) : (
               <div className="overflow-y-auto max-h-[350px] space-y-2 pr-1">
                 {myMealLogs.map((log) => (
-                  <div key={log.date} className="flex items-center justify-between p-2.5 rounded-lg border border-slate-100 hover:bg-slate-50/50 transition-colors">
+                  <div key={log.date} className="flex items-center justify-between p-2.5 rounded-lg border border-slate-100 hover:bg-slate-50/50 transition-colors gap-2">
                     <div className="flex flex-col min-w-0 pr-2">
                       <span className="text-[11px] font-medium text-slate-700">
                         {formatReadableDate(log.date)}
                       </span>
+                      {log.breakdown && log.count > 0 && (
+                        <span className="text-[10px] font-mono tabular-nums text-slate-500 mt-0.5">
+                          B:{log.breakdown.breakfast}
+                          {log.breakdown.breakfast >= 1 ? ` (${Math.round((log.breakdown.breakfast / 0.5) * 10) / 10}x)` : ''}
+                          {' '}· L:{log.breakdown.lunch} · D:{log.breakdown.dinner}
+                        </span>
+                      )}
                       {log.note && (
-                        <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/80 px-1.5 py-0.2 rounded font-medium mt-0.5 inline-block truncate max-w-[200px]">
+                        <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200/80 px-1.5 py-0.5 rounded font-medium mt-0.5 inline-block truncate max-w-[200px]">
                           {log.note}
                         </span>
                       )}
                     </div>
-                    <span className={`shrink-0 text-xs font-bold px-2 py-0.5 rounded-full ${
+                    <span className={`shrink-0 text-xs font-bold px-2 py-0.5 rounded-md font-mono tabular-nums ${
                       log.count > 0 
                         ? 'bg-blue-50 text-blue-700 border border-blue-100' 
                         : 'bg-slate-100 text-slate-400'

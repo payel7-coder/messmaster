@@ -36,8 +36,8 @@ import {
   BarChart3,
   ArrowRightLeft
 } from 'lucide-react';
-import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, CustomFixedBill, StandardFixedBillKey, SpecialMeal } from '../types';
-import { getDatesInMonth, formatReadableDate, formatReadableMonth } from '../utils';
+import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, CustomFixedBill, StandardFixedBillKey, SpecialMeal, MealBreakdown } from '../types';
+import { getDatesInMonth, formatReadableDate, formatReadableMonth, didBoarderEatBreakfast, getBoarderMealBreakdown } from '../utils';
 import PrintablePdfReportModal from './PrintablePdfReportModal';
 import BoarderMealSheetModal from './BoarderMealSheetModal';
 import BreakfastAuditModal from './BreakfastAuditModal';
@@ -117,10 +117,7 @@ export default function ManagerDashboard({
     const activeBoarders = boarders.filter(b => b.isActive);
     const monthLogs = mealLogs.filter(l => l.date.startsWith(settings.currentMonth));
     return activeBoarders.filter(b => {
-      const bDays = monthLogs.filter(l => {
-        const m = l.meals[b.id] || 0;
-        return (m % 1 >= 0.45 && m % 1 <= 0.55) || m === 0.5;
-      }).length;
+      const bDays = monthLogs.filter(l => didBoarderEatBreakfast(l, b.id)).length;
       return bDays < minBreakfastDays;
     }).length;
   }, [boarders, mealLogs, settings.currentMonth, minBreakfastDays]);
@@ -535,38 +532,79 @@ export default function ManagerDashboard({
     meals: {}
   };
 
-  const handleUpdateMeal = (boarderId: string, value: number) => {
-    const updatedMeals = { ...currentDayLog.meals, [boarderId]: Math.max(0, value) };
+  const saveUpdatedDayLog = (
+    updatedMeals: Record<string, number>,
+    updatedBreakdown: Record<string, MealBreakdown> | undefined
+  ) => {
     const nowIso = new Date().toISOString();
-    
+    const nextLog: DailyMealLog = {
+      date: selectedMealDate,
+      meals: updatedMeals,
+      ...(updatedBreakdown ? { mealBreakdown: updatedBreakdown } : {}),
+      ...(currentDayLog.note !== undefined ? { note: currentDayLog.note } : {}),
+      updatedAt: nowIso
+    };
+
     setMealLogs(prev => {
       const exists = prev.some(log => log.date === selectedMealDate);
       if (exists) {
-        return prev.map(log => log.date === selectedMealDate ? { ...log, meals: updatedMeals, updatedAt: nowIso } : log);
+        return prev.map(log => log.date === selectedMealDate ? nextLog : log);
       } else {
-        return [...prev, { date: selectedMealDate, meals: updatedMeals, note: currentDayLog.note, updatedAt: nowIso }];
+        return [...prev, nextLog];
       }
     });
 
-    syncMealLogToFirestore({
-      date: selectedMealDate,
-      meals: updatedMeals,
-      note: currentDayLog.note,
-      updatedAt: nowIso
-    });
+    syncMealLogToFirestore(nextLog);
+  };
+
+  const handleUpdateMealSlot = (
+    boarderId: string,
+    slot: keyof MealBreakdown,
+    value: number
+  ) => {
+    const currentBreakdown = getBoarderMealBreakdown(currentDayLog, boarderId);
+    const sanitizedSlot = Math.max(0, Number(value.toFixed(2)));
+    const nextBoarderBreakdown: MealBreakdown = {
+      ...currentBreakdown,
+      [slot]: sanitizedSlot,
+    };
+    const nextTotal = Number(
+      (nextBoarderBreakdown.breakfast + nextBoarderBreakdown.lunch + nextBoarderBreakdown.dinner).toFixed(2)
+    );
+
+    const updatedMeals = { ...currentDayLog.meals, [boarderId]: nextTotal };
+    const updatedBreakdown = {
+      ...(currentDayLog.mealBreakdown || {}),
+      [boarderId]: nextBoarderBreakdown,
+    };
+
+    saveUpdatedDayLog(updatedMeals, updatedBreakdown);
+  };
+
+  const handleSetBoarderBreakdown = (boarderId: string, breakdown: MealBreakdown) => {
+    const nextTotal = Number((breakdown.breakfast + breakdown.lunch + breakdown.dinner).toFixed(2));
+    const updatedMeals = { ...currentDayLog.meals, [boarderId]: nextTotal };
+    const updatedBreakdown = {
+      ...(currentDayLog.mealBreakdown || {}),
+      [boarderId]: breakdown,
+    };
+    saveUpdatedDayLog(updatedMeals, updatedBreakdown);
   };
 
   const handleBulkMeals = (type: 'all-regular' | 'all-zero' | 'copy-yesterday') => {
     const activeBoarders = boarders.filter(b => b.isActive);
     const updatedMeals = { ...currentDayLog.meals };
+    const updatedBreakdown: Record<string, MealBreakdown> = { ...(currentDayLog.mealBreakdown || {}) };
 
     if (type === 'all-regular') {
       activeBoarders.forEach(b => {
-        updatedMeals[b.id] = 2.5; // Breakfast 0.5, Lunch 1, Dinner 1
+        updatedMeals[b.id] = 2.5;
+        updatedBreakdown[b.id] = { breakfast: 0.5, lunch: 1, dinner: 1 };
       });
     } else if (type === 'all-zero') {
       activeBoarders.forEach(b => {
         updatedMeals[b.id] = 0;
+        updatedBreakdown[b.id] = { breakfast: 0, lunch: 0, dinner: 0 };
       });
     } else if (type === 'copy-yesterday') {
       const [year, month, day] = selectedMealDate.split('-');
@@ -577,27 +615,13 @@ export default function ManagerDashboard({
         if (prevLog) {
           activeBoarders.forEach(b => {
             updatedMeals[b.id] = prevLog.meals[b.id] ?? 0;
+            updatedBreakdown[b.id] = getBoarderMealBreakdown(prevLog, b.id);
           });
         }
       }
     }
 
-    const nowIso = new Date().toISOString();
-    setMealLogs(prev => {
-      const exists = prev.some(log => log.date === selectedMealDate);
-      if (exists) {
-        return prev.map(log => log.date === selectedMealDate ? { ...log, meals: updatedMeals, updatedAt: nowIso } : log);
-      } else {
-        return [...prev, { date: selectedMealDate, meals: updatedMeals, note: currentDayLog.note, updatedAt: nowIso }];
-      }
-    });
-
-    syncMealLogToFirestore({
-      date: selectedMealDate,
-      meals: updatedMeals,
-      note: currentDayLog.note,
-      updatedAt: nowIso
-    });
+    saveUpdatedDayLog(updatedMeals, updatedBreakdown);
   };
 
   const handleUpdateMealNote = (noteText: string) => {
@@ -1712,90 +1736,175 @@ export default function ManagerDashboard({
                 ) : (
                   boarders.filter(b => b.isActive).map((boarder) => {
                     const currentMealVal = currentDayLog.meals[boarder.id] ?? 0;
+                    const breakdown = getBoarderMealBreakdown(currentDayLog, boarder.id);
+                    const hasExplicitBreakdown = currentDayLog.mealBreakdown?.[boarder.id] !== undefined;
+                    const breakfastServings = Math.round((breakdown.breakfast / 0.5) * 10) / 10;
 
                     return (
                       <div 
                         key={boarder.id} 
-                        className={`flex flex-col sm:flex-row sm:items-center sm:justify-between p-3.5 rounded-xl border transition-all gap-3 ${
+                        className={`flex flex-col xl:flex-row xl:items-center xl:justify-between p-3.5 rounded-xl border transition-all gap-3 ${
                           isEditingMeals 
-                            ? 'border-gray-200 bg-white hover:border-gray-300 shadow-2xs' 
-                            : 'border-gray-100 bg-gray-50/60'
+                            ? 'border-slate-200 bg-white hover:border-slate-300 shadow-2xs' 
+                            : 'border-slate-100 bg-slate-50/70'
                         }`}
                       >
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-xs font-bold text-gray-800">{boarder.name}</p>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-xs font-bold text-slate-900">{boarder.name}</p>
                             {boarder.roomNo && (
-                              <span className="text-[10px] bg-slate-200/80 text-slate-700 px-1.5 py-0.2 rounded font-medium">
+                              <span className="text-[10px] bg-slate-200/80 text-slate-700 px-1.5 py-0.5 rounded font-mono font-medium">
                                 {boarder.roomNo}
                               </span>
                             )}
+                            {breakdown.breakfast >= 1 && (
+                              <span className="text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded-md font-mono tabular-nums">
+                                {breakfastServings}x Breakfast
+                              </span>
+                            )}
                           </div>
-                          {boarder.phone && <p className="text-[10px] text-gray-400 font-mono">{boarder.phone}</p>}
+                          {boarder.phone && <p className="text-[10px] text-slate-400 font-mono mt-0.5">{boarder.phone}</p>}
                         </div>
 
-                        {/* Increment controllers (Edit Mode) vs Protected Display (View Mode) */}
+                        {/* Slot-level controllers (Edit Mode) vs Protected Display (View Mode) */}
                         {isEditingMeals ? (
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleUpdateMeal(boarder.id, currentMealVal - 0.5)}
-                              className="w-8 h-8 rounded-lg bg-white border border-gray-200 hover:border-gray-300 flex items-center justify-center text-xs font-bold text-gray-600 transition-colors shadow-xs"
-                              title="Decrease 0.5"
-                            >
-                              -0.5
-                            </button>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {/* Breakfast Slot (0.5 per meal) */}
+                            <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs ${
+                              breakdown.breakfast > 0
+                                ? 'bg-amber-50/70 border-amber-200 text-amber-950'
+                                : 'bg-slate-50 border-slate-200 text-slate-600'
+                            }`}>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mr-0.5" title="Breakfast (0.5 per serving)">
+                                B
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateMealSlot(boarder.id, 'breakfast', breakdown.breakfast - 0.5)}
+                                className="w-6 h-6 rounded bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-600 cursor-pointer"
+                                title="Decrease Breakfast by 0.5"
+                              >
+                                -
+                              </button>
+                              <span className="w-9 text-center font-mono tabular-nums font-bold text-xs">
+                                {breakdown.breakfast}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateMealSlot(boarder.id, 'breakfast', breakdown.breakfast + 0.5)}
+                                className="w-6 h-6 rounded bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-700 cursor-pointer"
+                                title="Increase Breakfast by 0.5 (e.g. 1.0 = 2x breakfast)"
+                              >
+                                +
+                              </button>
+                            </div>
 
-                            <input
-                              type="number"
-                              step="0.5"
-                              min="0"
-                              value={currentMealVal === 0 ? '0' : currentMealVal}
-                              onChange={(e) => handleUpdateMeal(boarder.id, parseFloat(e.target.value) || 0)}
-                              className="w-16 h-8 text-center bg-white border border-gray-200 rounded-lg text-xs font-bold focus:ring-1 focus:ring-emerald-500"
-                            />
+                            {/* Lunch Slot (1.0 per meal) */}
+                            <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs ${
+                              breakdown.lunch > 0
+                                ? 'bg-blue-50/60 border-blue-200 text-blue-950'
+                                : 'bg-slate-50 border-slate-200 text-slate-600'
+                            }`}>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mr-0.5" title="Lunch (1.0 per meal)">
+                                L
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateMealSlot(boarder.id, 'lunch', breakdown.lunch - 1)}
+                                className="w-6 h-6 rounded bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-600 cursor-pointer"
+                                title="Decrease Lunch by 1"
+                              >
+                                -
+                              </button>
+                              <span className="w-7 text-center font-mono tabular-nums font-bold text-xs">
+                                {breakdown.lunch}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateMealSlot(boarder.id, 'lunch', breakdown.lunch + 1)}
+                                className="w-6 h-6 rounded bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-700 cursor-pointer"
+                                title="Increase Lunch by 1"
+                              >
+                                +
+                              </button>
+                            </div>
 
-                            <button
-                              onClick={() => handleUpdateMeal(boarder.id, currentMealVal + 0.5)}
-                              className="w-8 h-8 rounded-lg bg-white border border-gray-200 hover:border-gray-300 flex items-center justify-center text-xs font-bold text-gray-600 transition-colors shadow-xs"
-                              title="Increase 0.5"
-                            >
-                              +0.5
-                            </button>
+                            {/* Dinner Slot (1.0 per meal) */}
+                            <div className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs ${
+                              breakdown.dinner > 0
+                                ? 'bg-indigo-50/60 border-indigo-200 text-indigo-950'
+                                : 'bg-slate-50 border-slate-200 text-slate-600'
+                            }`}>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 mr-0.5" title="Dinner (1.0 per meal)">
+                                D
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateMealSlot(boarder.id, 'dinner', breakdown.dinner - 1)}
+                                className="w-6 h-6 rounded bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-600 cursor-pointer"
+                                title="Decrease Dinner by 1"
+                              >
+                                -
+                              </button>
+                              <span className="w-7 text-center font-mono tabular-nums font-bold text-xs">
+                                {breakdown.dinner}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateMealSlot(boarder.id, 'dinner', breakdown.dinner + 1)}
+                                className="w-6 h-6 rounded bg-white border border-slate-200 hover:bg-slate-100 flex items-center justify-center font-bold text-slate-700 cursor-pointer"
+                                title="Increase Dinner by 1"
+                              >
+                                +
+                              </button>
+                            </div>
 
-                            <div className="h-4 w-[1px] bg-gray-200 mx-1 hidden sm:block" />
+                            {/* Live Total + Presets */}
+                            <div className="flex items-center gap-1.5 ml-auto sm:ml-0">
+                              <span className="px-2.5 h-8 rounded-lg bg-slate-900 text-white font-mono tabular-nums text-xs font-bold flex items-center whitespace-nowrap">
+                                = {currentMealVal}m
+                              </span>
 
-                            <button
-                              onClick={() => handleUpdateMeal(boarder.id, currentMealVal + 1)}
-                              className="px-2.5 h-8 rounded-lg bg-white border border-gray-200 hover:border-gray-300 flex items-center justify-center text-xs font-bold text-gray-600 transition-colors shadow-xs"
-                              title="Increase 1.0"
-                            >
-                              +1
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSetBoarderBreakdown(boarder.id, { breakfast: 0.5, lunch: 1, dinner: 1 })}
+                                className="px-2.5 h-8 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 flex items-center justify-center text-xs font-semibold text-blue-700 transition-colors cursor-pointer whitespace-nowrap"
+                                title="Set standard 2.5 full day (B: 0.5, L: 1, D: 1)"
+                              >
+                                2.5 Full
+                              </button>
 
-                            <button
-                              onClick={() => handleUpdateMeal(boarder.id, 2.5)}
-                              className="px-2.5 h-8 rounded-lg bg-blue-50 hover:bg-blue-100 border border-blue-200 flex items-center justify-center text-xs font-bold text-blue-700 transition-colors"
-                              title="Set 2.5 full meals"
-                            >
-                              2.5 Full
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSetBoarderBreakdown(boarder.id, { breakfast: 0, lunch: 0, dinner: 0 })}
+                                className="px-2 h-8 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-xs font-semibold text-slate-600 transition-colors cursor-pointer whitespace-nowrap"
+                                title="Clear day meals to 0"
+                              >
+                                0
+                              </button>
+                            </div>
                           </div>
                         ) : (
-                          /* View Mode: Clean protected badge */
-                          <div className="flex items-center gap-2">
-                            <span className={`px-3 py-1.5 rounded-xl text-xs font-bold border ${
+                          /* View Mode: Protected badge + breakdown */
+                          <div className="flex flex-wrap items-center gap-2">
+                            {(hasExplicitBreakdown || currentMealVal > 0) && (
+                              <span className="text-[11px] font-mono tabular-nums text-slate-500 bg-white border border-slate-200 px-2 py-1 rounded-md">
+                                B:{breakdown.breakfast} · L:{breakdown.lunch} · D:{breakdown.dinner}
+                              </span>
+                            )}
+                            <span className={`px-3 py-1 rounded-lg text-xs font-bold border font-mono tabular-nums ${
                               currentMealVal === 0
                                 ? 'bg-slate-100 text-slate-500 border-slate-200 font-normal'
                                 : currentMealVal === 2.5
-                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200 font-extrabold'
-                                : 'bg-blue-50 text-blue-800 border-blue-200 font-extrabold'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : 'bg-blue-50 text-blue-800 border-blue-200'
                             }`}>
                               {currentMealVal === 2.5 ? '2.5 Full' : `${currentMealVal} meals`}
                             </span>
 
                             <button
                               onClick={() => setIsEditingMeals(true)}
-                              className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold px-2 py-1 rounded hover:bg-blue-50 transition-colors cursor-pointer"
+                              className="text-xs text-blue-600 hover:text-blue-800 font-semibold px-2 py-1 rounded hover:bg-blue-50 transition-colors cursor-pointer"
                               title="Unlock to edit meals"
                             >
                               Edit
@@ -1827,7 +1936,7 @@ export default function ManagerDashboard({
 
             <div className="border-t border-slate-100 pt-4 mt-6 flex items-center gap-1.5 text-xs text-slate-500">
               <Info className="w-4 h-4 text-blue-600 shrink-0" />
-              <span>Standard rates: Breakfast (0.5), Lunch (1.0), Dinner (1.0) = 2.5 full meals daily per boarder.</span>
+              <span>Slot tracking: Breakfast (0.5/meal, e.g. 1.0 = 2x breakfast), Lunch (1.0), Dinner (1.0). All breakfast slots &gt; 0 count toward the monthly Breakfast Rule.</span>
             </div>
           </div>
 

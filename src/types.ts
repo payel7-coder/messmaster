@@ -16,9 +16,16 @@ export interface Deposit {
   createdAt?: string; // ISO timestamp for audit log
 }
 
+export interface MealBreakdown {
+  breakfast: number; // e.g., 0, 0.5 (1x breakfast), 1 (2x breakfast), 1.5 (3x breakfast)
+  lunch: number;     // e.g., 0, 1, 2
+  dinner: number;    // e.g., 0, 1, 2
+}
+
 export interface DailyMealLog {
   date: string; // YYYY-MM-DD
-  meals: Record<string, number>; // boarderId -> number of meals (e.g., 0.5, 1, 2, 2.5)
+  meals: Record<string, number>; // boarderId -> total number of meals (e.g., 0.5, 1, 2, 2.5, 3)
+  mealBreakdown?: Record<string, MealBreakdown>; // Per-slot breakdown (breakfast/lunch/dinner) per boarder
   note?: string; // Optional context like 'Special Lunch', 'Guest Invitation', 'Feast'
   updatedAt?: string; // ISO timestamp for audit log
 }
