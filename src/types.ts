@@ -5,6 +5,7 @@ export interface Boarder {
   phone?: string;
   isActive: boolean;
   joinedDate: string; // YYYY-MM-DD
+  pin?: string; // Optional personal access PIN to protect boarder's statement
 }
 
 export interface Deposit {
@@ -115,6 +116,7 @@ export interface MessSettings {
   currentManagerName?: string; // Name of the currently appointed manager
   currentManagerPhone?: string; // Contact phone/bKash of the currently appointed manager
   closureHistory?: MonthClosureRecord[]; // Archive of closed months and manager handover records
+  hideBoardersWithoutPin?: boolean; // Hide boarders directory in public view; require Personal PIN lookup
 }
 
 export interface MonthClosureRecord {

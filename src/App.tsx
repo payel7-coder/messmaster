@@ -31,7 +31,9 @@ import {
   UserPlus,
   Users,
   ArrowRightLeft,
-  BarChart3
+  BarChart3,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, RegisteredManager, MonthClosureRecord } from './types';
@@ -175,6 +177,12 @@ export default function App() {
   // Settings PIN management local state
   const [newPinInput, setNewPinInput] = useState<string>('');
   const [pinChangeSuccess, setPinChangeSuccess] = useState<boolean>(false);
+
+  // Boarder Personal PIN Unlock State (session-scoped)
+  const [unlockedBoarderIds, setUnlockedBoarderIds] = useState<Record<string, boolean>>({});
+  const [boarderPinInput, setBoarderPinInput] = useState<string>('');
+  const [boarderPinError, setBoarderPinError] = useState<string>('');
+  const [showBoarderPinInput, setShowBoarderPinInput] = useState<boolean>(false);
 
   // Registered Managers state (Google SSO RBAC)
   const [registeredManagers, setRegisteredManagers] = useState<RegisteredManager[]>([]);
@@ -495,6 +503,9 @@ export default function App() {
     sessionStorage.removeItem('mess_manager_auth');
     setGoogleUser(null);
     setIsManagerAuthenticated(false);
+    setUnlockedBoarderIds({});
+    setBoarderPinInput('');
+    setBoarderPinError('');
     setRole('boarder');
     setActiveTab('dashboard');
     setCloudToast({
@@ -513,10 +524,74 @@ export default function App() {
       }
     } else {
       setRole('boarder');
+      setBoarderPinInput('');
+      setBoarderPinError('');
       if (activeTab === 'report' || activeTab === 'analytics') {
         setActiveTab('dashboard');
       }
     }
+  };
+
+  const handleSelectBoarder = (id: string) => {
+    setSelectedBoarderId(id);
+    setBoarderPinInput('');
+    setBoarderPinError('');
+    setShowBoarderPinInput(false);
+  };
+
+  const handleUnlockSelectedBoarder = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBoarder) return;
+    const entered = boarderPinInput.trim();
+    if (!entered) {
+      setBoarderPinError('Please enter your Personal PIN.');
+      return;
+    }
+    if (entered === selectedBoarder.pin?.trim()) {
+      setUnlockedBoarderIds(prev => ({ ...prev, [selectedBoarder.id]: true }));
+      setBoarderPinInput('');
+      setBoarderPinError('');
+      setShowBoarderPinInput(false);
+    } else {
+      setBoarderPinError('Incorrect PIN. Please verify your Personal PIN with the manager.');
+    }
+  };
+
+  const handleLookupBoarderByPin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const entered = boarderPinInput.trim();
+    if (!entered) {
+      setBoarderPinError('Please enter your Personal PIN.');
+      return;
+    }
+    const matches = boarders.filter(b => b.isActive && b.pin?.trim() === entered);
+    if (matches.length === 1) {
+      const target = matches[0];
+      setSelectedBoarderId(target.id);
+      setUnlockedBoarderIds(prev => ({ ...prev, [target.id]: true }));
+      setBoarderPinInput('');
+      setBoarderPinError('');
+      setShowBoarderPinInput(false);
+    } else if (matches.length > 1) {
+      setBoarderPinError('Multiple boarders share this PIN. Contact your manager to assign unique PINs.');
+    } else {
+      setBoarderPinError('No active boarder matched this PIN. Please check and try again.');
+    }
+  };
+
+  const handleLockBoarderStatement = (boarderId?: string) => {
+    if (boarderId && !settings.hideBoardersWithoutPin) {
+      setUnlockedBoarderIds(prev => {
+        const next = { ...prev };
+        delete next[boarderId];
+        return next;
+      });
+    } else {
+      setUnlockedBoarderIds({});
+    }
+    setBoarderPinInput('');
+    setBoarderPinError('');
+    setShowBoarderPinInput(false);
   };
 
   const handleUpdateSettings = (partial: Partial<MessSettings>) => {
@@ -756,7 +831,7 @@ export default function App() {
         role={role}
         setRole={handleRoleChange}
         selectedBoarderId={selectedBoarderId}
-        setSelectedBoarderId={setSelectedBoarderId}
+        setSelectedBoarderId={handleSelectBoarder}
         boarders={boarders}
         currentMonth={settings.currentMonth}
         onSimulateData={handleSimulateData}
@@ -766,6 +841,9 @@ export default function App() {
         onRequireManagerLogin={handleRequireManagerLogin}
         onManagerLogout={handleManagerLogout}
         onNavigateTab={(tab) => setActiveTab(tab)}
+        hideBoardersWithoutPin={Boolean(settings.hideBoardersWithoutPin)}
+        isSelectedBoarderUnlocked={Boolean(selectedBoarder && unlockedBoarderIds[selectedBoarder.id])}
+        onLockBoarder={() => handleLockBoarderStatement(selectedBoarder?.id)}
       />
 
       {/* Main Core Container */}
@@ -967,16 +1045,169 @@ export default function App() {
               )
             ) : (
               selectedBoarder ? (
-                <BoarderDashboard
-                  boarder={selectedBoarder}
-                  report={report}
-                  deposits={deposits}
-                  mealLogs={mealLogs}
-                  allBoarders={boarders}
-                  bazaarCosts={bazaarCosts}
-                  miscCosts={miscCosts}
-                  settings={settings}
-                />
+                (settings.hideBoardersWithoutPin && !isManagerAuthenticated && !unlockedBoarderIds[selectedBoarder.id]) ? (
+                  /* Strict PIN-Only Lookup Screen: Hides all boarders & financial figures until Personal PIN is verified */
+                  <div className="bg-white border border-slate-200/90 rounded-2xl max-w-md mx-auto overflow-hidden animate-fadeIn">
+                    <div className="bg-slate-900 text-white p-6 text-center">
+                      <div className="w-12 h-12 bg-slate-800 border border-slate-700 rounded-xl flex items-center justify-center mx-auto mb-3">
+                        <Lock className="w-6 h-6 text-blue-400" />
+                      </div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-blue-400">
+                        {settings.messName || 'MessMaster'} · Private Access
+                      </p>
+                      <h3 className="text-lg font-bold text-white tracking-tight mt-1">
+                        Enter Personal PIN
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                        Member directory and financial statements are hidden. Enter your personal PIN to unlock your statement.
+                      </p>
+                    </div>
+
+                    <form onSubmit={handleLookupBoarderByPin} className="p-6 space-y-4">
+                      <div>
+                        <label htmlFor="input-boarder-pin-lookup" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Personal Statement PIN
+                        </label>
+                        <div className="relative">
+                          <input
+                            id="input-boarder-pin-lookup"
+                            type={showBoarderPinInput ? 'text' : 'password'}
+                            inputMode="numeric"
+                            autoFocus
+                            value={boarderPinInput}
+                            onChange={(e) => {
+                              setBoarderPinInput(e.target.value);
+                              setBoarderPinError('');
+                            }}
+                            placeholder="Enter your PIN (e.g. 4821)"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 pr-10 text-sm font-mono font-bold text-slate-900 tracking-widest focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-hidden"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowBoarderPinInput(prev => !prev)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                            title={showBoarderPinInput ? 'Hide PIN' : 'Show PIN'}
+                          >
+                            {showBoarderPinInput ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        {boarderPinError && (
+                          <p className="text-xs text-rose-600 font-semibold flex items-center gap-1.5 mt-2">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>{boarderPinError}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      <button
+                        type="submit"
+                        id="btn-unlock-boarder-lookup"
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2.5 px-4 rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Unlock className="w-3.5 h-3.5" />
+                        <span>Unlock My Statement</span>
+                      </button>
+
+                      <p className="text-[11px] text-slate-500 text-center leading-relaxed">
+                        Forgot your PIN? Ask your Mess Manager to check or reset it in the Boarders Registry.
+                      </p>
+                    </form>
+                  </div>
+                ) : (selectedBoarder.pin?.trim() && !unlockedBoarderIds[selectedBoarder.id]) ? (
+                  /* Per-Boarder Statement PIN Lock Screen */
+                  <div className="bg-white border border-slate-200/90 rounded-2xl max-w-md mx-auto overflow-hidden animate-fadeIn">
+                    <div className="bg-slate-900 text-white p-6 text-center">
+                      <div className="w-12 h-12 bg-slate-800 border border-slate-700 rounded-xl flex items-center justify-center mx-auto mb-3">
+                        <KeyRound className="w-6 h-6 text-blue-400" />
+                      </div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-blue-400">
+                        Statement Protected
+                      </p>
+                      <h3 className="text-lg font-bold text-white tracking-tight mt-1">
+                        {selectedBoarder.name}
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {selectedBoarder.roomNo ? `Room ${selectedBoarder.roomNo} · ` : ''}Enter Personal PIN to reveal balance, deposits & meals
+                      </p>
+                    </div>
+
+                    <form onSubmit={handleUnlockSelectedBoarder} className="p-6 space-y-4">
+                      <div>
+                        <label htmlFor="input-boarder-pin" className="block text-xs font-semibold text-slate-700 mb-1.5">
+                          Personal Access PIN
+                        </label>
+                        <div className="relative">
+                          <input
+                            id="input-boarder-pin"
+                            type={showBoarderPinInput ? 'text' : 'password'}
+                            inputMode="numeric"
+                            autoFocus
+                            value={boarderPinInput}
+                            onChange={(e) => {
+                              setBoarderPinInput(e.target.value);
+                              setBoarderPinError('');
+                            }}
+                            placeholder="Enter PIN"
+                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 pr-10 text-sm font-mono font-bold text-slate-900 tracking-widest focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:outline-hidden"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowBoarderPinInput(prev => !prev)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                            title={showBoarderPinInput ? 'Hide PIN' : 'Show PIN'}
+                          >
+                            {showBoarderPinInput ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                        {boarderPinError && (
+                          <p className="text-xs text-rose-600 font-semibold flex items-center gap-1.5 mt-2">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                            <span>{boarderPinError}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      <button
+                        type="submit"
+                        id="btn-unlock-boarder-statement"
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs py-2.5 px-4 rounded-xl transition-colors cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <Unlock className="w-3.5 h-3.5" />
+                        <span>Unlock Statement</span>
+                      </button>
+
+                      {isManagerAuthenticated && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUnlockedBoarderIds(prev => ({ ...prev, [selectedBoarder.id]: true }));
+                            setBoarderPinInput('');
+                            setBoarderPinError('');
+                          }}
+                          className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs py-2 px-4 rounded-xl transition-colors cursor-pointer"
+                        >
+                          Preview Statement as Manager
+                        </button>
+                      )}
+
+                      <p className="text-[11px] text-slate-500 text-center leading-relaxed">
+                        Forgot PIN? Contact your Mess Manager to view or update your personal passcode.
+                      </p>
+                    </form>
+                  </div>
+                ) : (
+                  <BoarderDashboard
+                    boarder={selectedBoarder}
+                    report={report}
+                    deposits={deposits}
+                    mealLogs={mealLogs}
+                    allBoarders={boarders}
+                    bazaarCosts={bazaarCosts}
+                    miscCosts={miscCosts}
+                    settings={settings}
+                    onLockStatement={(selectedBoarder.pin?.trim() || settings.hideBoardersWithoutPin) ? () => handleLockBoarderStatement(selectedBoarder.id) : undefined}
+                  />
+                )
               ) : (
                 <div className="bg-white border border-slate-200 rounded-xl p-8 text-center space-y-4 shadow-xs">
                   <div className="max-w-xs mx-auto text-slate-400">
@@ -1321,8 +1552,44 @@ export default function App() {
                       </p>
                     )}
                     <p className="text-[10px] text-gray-400 mt-1.5 leading-normal">
-                      * This PIN locks access to the Manager Console. Boarders can continue viewing everything in public mode without a password.
+                      * This PIN locks access to the Manager Console. Individual boarder statement PINs can be managed inside Manager Console → Boarders.
                     </p>
+                  </div>
+
+                  {/* Boarder Statement Privacy Toggle */}
+                  <div className="pt-4 border-t border-slate-100">
+                    <div className="flex items-start justify-between gap-4 bg-slate-50 border border-slate-200/90 rounded-xl p-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Lock className="w-4 h-4 text-blue-600 shrink-0" />
+                          <span className="text-xs font-bold text-slate-900">
+                            Hide Boarder Directory in Public View (PIN-Only Access)
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                          When enabled, boarders cannot browse the member dropdown in public view—they must enter their Personal PIN to locate and unlock only their own statement.
+                        </p>
+                        <p className="text-[11px] font-semibold text-slate-700">
+                          Protected Active Boarders: {boarders.filter(b => b.isActive && b.pin?.trim()).length} / {boarders.filter(b => b.isActive).length}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={Boolean(settings.hideBoardersWithoutPin)}
+                        onClick={() => handleUpdateSettings({ hideBoardersWithoutPin: !settings.hideBoardersWithoutPin })}
+                        id="toggle-hide-boarders-without-pin"
+                        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-hidden ${
+                          settings.hideBoardersWithoutPin ? 'bg-blue-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-xs transition duration-200 ${
+                            settings.hideBoardersWithoutPin ? 'translate-x-5' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Registered Managers (Google SSO Authorized RBAC) */}

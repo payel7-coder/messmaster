@@ -37,6 +37,9 @@ interface RoleSelectorProps {
   onRequireManagerLogin: () => void;
   onManagerLogout: () => void;
   onNavigateTab?: (tab: 'dashboard' | 'report' | 'settings') => void;
+  hideBoardersWithoutPin?: boolean;
+  isSelectedBoarderUnlocked?: boolean;
+  onLockBoarder?: () => void;
 }
 
 export default function RoleSelector({
@@ -53,8 +56,12 @@ export default function RoleSelector({
   onRequireManagerLogin,
   onManagerLogout,
   onNavigateTab,
+  hideBoardersWithoutPin = false,
+  isSelectedBoarderUnlocked = false,
+  onLockBoarder,
 }: RoleSelectorProps) {
   const activeBoarders = boarders.filter(b => b.isActive);
+  const selectedBoarderObj = activeBoarders.find(b => b.id === selectedBoarderId);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -167,21 +174,48 @@ export default function RoleSelector({
 
             {/* Boarder selector dropdown when in Boarder role */}
             {role === 'boarder' && activeBoarders.length > 0 && (
-              <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg">
-                <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap">Member:</span>
-                <select
-                  value={selectedBoarderId}
-                  onChange={(e) => setSelectedBoarderId(e.target.value)}
-                  id="select-boarder-view"
-                  className="bg-transparent text-slate-900 text-xs font-semibold cursor-pointer focus:outline-hidden max-w-[160px] truncate"
-                >
-                  {activeBoarders.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name}{b.roomNo ? ` (${b.roomNo})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              hideBoardersWithoutPin && !isManagerAuthenticated ? (
+                isSelectedBoarderUnlocked && selectedBoarderObj ? (
+                  <div className="flex items-center gap-2 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg">
+                    <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap">Member:</span>
+                    <span className="text-xs font-semibold text-slate-900 max-w-[140px] truncate">
+                      {selectedBoarderObj.name}
+                    </span>
+                    {onLockBoarder && (
+                      <button
+                        type="button"
+                        onClick={onLockBoarder}
+                        className="ml-0.5 text-[11px] font-semibold text-slate-500 hover:text-rose-600 flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
+                        title="Lock & switch member"
+                      >
+                        <Lock className="w-3 h-3" />
+                        <span>Lock</span>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-slate-600 whitespace-nowrap">
+                    <Lock className="w-3 h-3 text-slate-500" />
+                    <span>PIN Protected</span>
+                  </div>
+                )
+              ) : (
+                <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg">
+                  <span className="text-[11px] text-slate-500 font-medium whitespace-nowrap">Member:</span>
+                  <select
+                    value={selectedBoarderId}
+                    onChange={(e) => setSelectedBoarderId(e.target.value)}
+                    id="select-boarder-view"
+                    className="bg-transparent text-slate-900 text-xs font-semibold cursor-pointer focus:outline-hidden max-w-[175px] truncate"
+                  >
+                    {activeBoarders.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}{b.roomNo ? ` (${b.roomNo})` : ''}{b.pin ? ' 🔒' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )
             )}
 
             {/* Authenticated Manager Identity & Dropdown Menu */}

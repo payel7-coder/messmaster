@@ -35,6 +35,7 @@ interface BoarderDashboardProps {
   bazaarCosts?: BazaarCost[];
   miscCosts?: MiscellaneousCosts;
   settings?: MessSettings;
+  onLockStatement?: () => void;
 }
 
 export default function BoarderDashboard({
@@ -45,6 +46,7 @@ export default function BoarderDashboard({
   allBoarders,
   bazaarCosts,
   settings,
+  onLockStatement,
 }: BoarderDashboardProps) {
   const [showSlipModal, setShowSlipModal] = useState(false);
   const [isDownloadingSlip, setIsDownloadingSlip] = useState(false);
@@ -146,6 +148,18 @@ export default function BoarderDashboard({
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+          {onLockStatement && (
+            <button
+              type="button"
+              onClick={onLockStatement}
+              id="btn-boarder-lock-statement"
+              className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs px-3.5 py-2.5 rounded-xl cursor-pointer transition-colors whitespace-nowrap shrink-0"
+              title="Lock statement with Personal PIN"
+            >
+              <Lock className="w-3.5 h-3.5 text-slate-300" />
+              <span>Lock Statement</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowSlipModal(true)}

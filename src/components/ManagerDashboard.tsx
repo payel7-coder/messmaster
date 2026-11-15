@@ -34,7 +34,9 @@ import {
   UtensilsCrossed,
   Sparkles,
   BarChart3,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, CustomFixedBill, StandardFixedBillKey, SpecialMeal, MealBreakdown } from '../types';
 import { getDatesInMonth, formatReadableDate, formatReadableMonth, didBoarderEatBreakfast, getBoarderMealBreakdown } from '../utils';
@@ -225,19 +227,49 @@ export default function ManagerDashboard({
   const [newBoarderName, setNewBoarderName] = useState<string>('');
   const [newBoarderRoomNo, setNewBoarderRoomNo] = useState<string>('');
   const [newBoarderPhone, setNewBoarderPhone] = useState<string>('');
+  const [newBoarderPin, setNewBoarderPin] = useState<string>('');
+  const [newBoarderPinError, setNewBoarderPinError] = useState<string>('');
 
   // --- Boarder Edit Form State ---
   const [editingBoarder, setEditingBoarder] = useState<Boarder | null>(null);
   const [editBoarderName, setEditBoarderName] = useState<string>('');
   const [editBoarderRoomNo, setEditBoarderRoomNo] = useState<string>('');
   const [editBoarderPhone, setEditBoarderPhone] = useState<string>('');
+  const [editBoarderPin, setEditBoarderPin] = useState<string>('');
+  const [editBoarderPinError, setEditBoarderPinError] = useState<string>('');
+  const [showEditPin, setShowEditPin] = useState<boolean>(false);
   const [editBoarderActive, setEditBoarderActive] = useState<boolean>(true);
+
+  // --- Boarder PIN Visibility & Copy State ---
+  const [revealedPinIds, setRevealedPinIds] = useState<Record<string, boolean>>({});
+  const [showAllPins, setShowAllPins] = useState<boolean>(false);
+  const [copiedPinId, setCopiedPinId] = useState<string | null>(null);
+  const [pinBulkMessage, setPinBulkMessage] = useState<string | null>(null);
+
+  const generateUniqueBoarderPin = (existingBoarders: Boarder[], excludeId?: string, extraUsed: Set<string> = new Set()): string => {
+    const usedPins = new Set(
+      existingBoarders
+        .filter(b => b.id !== excludeId && b.pin)
+        .map(b => b.pin!.trim())
+    );
+    extraUsed.forEach(p => usedPins.add(p));
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const candidate = String(Math.floor(1000 + Math.random() * 9000));
+      if (!usedPins.has(candidate)) {
+        return candidate;
+      }
+    }
+    return String(Math.floor(10000 + Math.random() * 90000));
+  };
 
   const handleOpenEditBoarder = (b: Boarder) => {
     setEditingBoarder(b);
     setEditBoarderName(b.name);
     setEditBoarderRoomNo(b.roomNo || '');
     setEditBoarderPhone(b.phone || '');
+    setEditBoarderPin(b.pin || '');
+    setEditBoarderPinError('');
+    setShowEditPin(false);
     setEditBoarderActive(b.isActive);
   };
 
@@ -245,11 +277,22 @@ export default function ManagerDashboard({
     e.preventDefault();
     if (!editingBoarder || !editBoarderName.trim()) return;
 
+    const cleanPin = editBoarderPin.trim();
+    if (cleanPin && cleanPin.length < 4) {
+      setEditBoarderPinError('PIN must be at least 4 digits/characters.');
+      return;
+    }
+    if (cleanPin && boarders.some(b => b.id !== editingBoarder.id && b.pin?.trim() === cleanPin)) {
+      setEditBoarderPinError('This PIN is already assigned to another boarder. Choose a unique PIN.');
+      return;
+    }
+
     const updated: Boarder = {
       ...editingBoarder,
       name: editBoarderName.trim(),
       roomNo: editBoarderRoomNo.trim() || undefined,
       phone: editBoarderPhone.trim() || undefined,
+      pin: cleanPin || undefined,
       isActive: editBoarderActive
     };
 
@@ -880,11 +923,23 @@ export default function ManagerDashboard({
     e.preventDefault();
     if (!newBoarderName.trim()) return;
 
+    const cleanPin = newBoarderPin.trim();
+    if (cleanPin && cleanPin.length < 4) {
+      setNewBoarderPinError('PIN must be at least 4 digits/characters.');
+      return;
+    }
+    if (cleanPin && boarders.some(b => b.pin?.trim() === cleanPin)) {
+      setNewBoarderPinError('This PIN is already assigned to another boarder.');
+      return;
+    }
+    setNewBoarderPinError('');
+
     const newB: Boarder = {
       id: `b_${Date.now()}`,
       name: newBoarderName.trim(),
       roomNo: newBoarderRoomNo.trim() || undefined,
       phone: newBoarderPhone.trim() || undefined,
+      pin: cleanPin || undefined,
       isActive: true,
       joinedDate: new Date().toISOString().split('T')[0]
     };
@@ -894,9 +949,41 @@ export default function ManagerDashboard({
     setNewBoarderName('');
     setNewBoarderRoomNo('');
     setNewBoarderPhone('');
+    setNewBoarderPin('');
     
     if (!depositBoarderId) setDepositBoarderId(newB.id);
     if (!bazaarBuyer) setBazaarBuyer(newB.id);
+  };
+
+  const handleAutoAssignMissingPins = () => {
+    const missing = boarders.filter(b => !b.pin?.trim());
+    if (missing.length === 0) {
+      setPinBulkMessage('All boarders already have a Personal PIN assigned.');
+      setTimeout(() => setPinBulkMessage(null), 4000);
+      return;
+    }
+
+    const allocatedPins = new Set<string>();
+    const updatedList = boarders.map(b => {
+      if (b.pin?.trim()) return b;
+      const generated = generateUniqueBoarderPin(boarders, b.id, allocatedPins);
+      allocatedPins.add(generated);
+      const updatedBoarder = { ...b, pin: generated };
+      syncBoarderToFirestore(updatedBoarder);
+      return updatedBoarder;
+    });
+
+    setBoarders(updatedList);
+    setPinBulkMessage(`Generated unique 4-digit PINs for ${missing.length} boarder${missing.length > 1 ? 's' : ''} and synced to Cloud.`);
+    setTimeout(() => setPinBulkMessage(null), 5000);
+  };
+
+  const handleCopyBoarderPin = (boarderId: string, pin: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(pin).catch(() => {});
+    }
+    setCopiedPinId(boarderId);
+    setTimeout(() => setCopiedPinId(prev => (prev === boarderId ? null : prev)), 2000);
   };
 
   const handleToggleBoarderActive = (id: string) => {
@@ -3312,6 +3399,39 @@ export default function ManagerDashboard({
                 />
               </div>
 
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-500">
+                    Statement PIN <span className="text-[10px] font-normal text-slate-400">(Protects View)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewBoarderPin(generateUniqueBoarderPin(boarders));
+                      setNewBoarderPinError('');
+                    }}
+                    className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 cursor-pointer"
+                  >
+                    Generate 4-Digit
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={8}
+                  placeholder="e.g. 4821 (optional)"
+                  value={newBoarderPin}
+                  onChange={(e) => {
+                    setNewBoarderPin(e.target.value);
+                    setNewBoarderPinError('');
+                  }}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-lg p-2.5 text-xs font-mono font-semibold focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                />
+                {newBoarderPinError && (
+                  <p className="text-[11px] text-rose-600 font-semibold mt-1">{newBoarderPinError}</p>
+                )}
+              </div>
+
               <button
                 type="submit"
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-lg text-xs transition-colors cursor-pointer flex items-center justify-center gap-1 shadow-xs"
@@ -3325,7 +3445,40 @@ export default function ManagerDashboard({
 
           {/* Boarders List Table */}
           <div className="lg:col-span-2 bg-white border border-slate-200 rounded-xl shadow-xs p-5">
-            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Boarders Registry</h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-4">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Boarders Registry</h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  {boarders.filter(b => b.pin?.trim()).length} of {boarders.length} boarders protected by Personal PIN
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowAllPins(prev => !prev)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                >
+                  {showAllPins ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  <span>{showAllPins ? 'Mask PINs' : 'Reveal PINs'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAutoAssignMissingPins}
+                  id="btn-auto-assign-boarder-pins"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Auto-Assign Missing PINs</span>
+                </button>
+              </div>
+            </div>
+
+            {pinBulkMessage && (
+              <div className="mb-3 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>{pinBulkMessage}</span>
+              </div>
+            )}
             
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
@@ -3334,12 +3487,15 @@ export default function ManagerDashboard({
                     <th className="py-2.5 font-bold">Name</th>
                     <th className="py-2.5 font-bold">Room No</th>
                     <th className="py-2.5 font-bold">Contact</th>
+                    <th className="py-2.5 font-bold">Statement PIN</th>
                     <th className="py-2.5 font-bold">Status</th>
                     <th className="py-2.5 font-bold text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {boarders.map((b) => (
+                  {boarders.map((b) => {
+                    const isPinVisible = showAllPins || Boolean(revealedPinIds[b.id]);
+                    return (
                     <tr key={b.id} className="hover:bg-slate-50/50">
                       <td className="py-3">
                         <span className="font-bold text-slate-800">{b.name}</span>
@@ -3355,6 +3511,44 @@ export default function ManagerDashboard({
                         )}
                       </td>
                       <td className="py-3 font-mono text-slate-500">{b.phone || 'N/A'}</td>
+                      <td className="py-3">
+                        {b.pin ? (
+                          <div className="inline-flex items-center gap-1.5 bg-slate-100 border border-slate-200/80 rounded-md px-2 py-1">
+                            <Lock className="w-3 h-3 text-emerald-600 shrink-0" />
+                            <span className="font-mono font-bold text-slate-800 tracking-wider text-[11px]">
+                              {isPinVisible ? b.pin : '••••'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setRevealedPinIds(prev => ({ ...prev, [b.id]: !prev[b.id] }))}
+                              className="text-slate-400 hover:text-slate-700 cursor-pointer"
+                              title={isPinVisible ? 'Hide PIN' : 'Show PIN'}
+                            >
+                              {isPinVisible ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCopyBoarderPin(b.id, b.pin!)}
+                              className="text-slate-400 hover:text-blue-600 cursor-pointer"
+                              title="Copy PIN"
+                            >
+                              {copiedPinId === b.id ? (
+                                <Check className="w-3 h-3 text-emerald-600" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditBoarder(b)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 cursor-pointer"
+                          >
+                            <span>No PIN · Set</span>
+                          </button>
+                        )}
+                      </td>
                       <td className="py-3">
                         <button
                           onClick={() => handleToggleBoarderActive(b.id)}
@@ -3385,12 +3579,13 @@ export default function ManagerDashboard({
                         </button>
                       </td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </div>
             <p className="text-[10px] text-slate-400 mt-4 leading-relaxed">
-              * Inactive boarders do not get billed for shared utility fees or house rent. Use inactive status if a member goes on vacation or leaves temporarily for the entire month.
+              * Boarders with a Statement PIN must enter their passcode in Boarder View before seeing their balance, deposits, or meal log. Inactive boarders do not get billed for shared utility fees or house rent.
             </p>
           </div>
 
@@ -3586,6 +3781,67 @@ export default function ManagerDashboard({
                   onChange={(e) => setEditBoarderPhone(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs font-medium focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
                 />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Personal Statement PIN
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditBoarderPin(generateUniqueBoarderPin(boarders, editingBoarder.id));
+                        setEditBoarderPinError('');
+                        setShowEditPin(true);
+                      }}
+                      className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 cursor-pointer"
+                    >
+                      Generate
+                    </button>
+                    {editBoarderPin && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditBoarderPin('');
+                          setEditBoarderPinError('');
+                        }}
+                        className="text-[11px] font-semibold text-slate-400 hover:text-rose-600 cursor-pointer"
+                      >
+                        Remove PIN
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showEditPin ? 'text' : 'password'}
+                    inputMode="numeric"
+                    maxLength={8}
+                    placeholder="Leave blank for no PIN"
+                    value={editBoarderPin}
+                    onChange={(e) => {
+                      setEditBoarderPin(e.target.value);
+                      setEditBoarderPinError('');
+                    }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 pr-9 text-xs font-mono font-bold focus:bg-white focus:ring-1 focus:ring-blue-500 focus:outline-hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPin(prev => !prev)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                    title={showEditPin ? 'Hide PIN' : 'Show PIN'}
+                  >
+                    {showEditPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {editBoarderPinError && (
+                  <p className="text-[11px] text-rose-600 font-semibold mt-1">{editBoarderPinError}</p>
+                )}
+                <p className="text-[10px] text-slate-400 mt-1">
+                  Boarder must enter this PIN to unlock their personal statement.
+                </p>
               </div>
 
               <div className="flex items-center gap-2 pt-1">
