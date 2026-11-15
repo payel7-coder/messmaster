@@ -20,11 +20,13 @@ import {
   CheckCircle2,
   Lock,
   Coffee,
+  Sun,
+  Moon,
   Sparkles,
   UtensilsCrossed
 } from 'lucide-react';
 import { Boarder, Deposit, DailyMealLog, MonthReport, BoarderSummary, MessSettings, BazaarCost, MiscellaneousCosts } from '../types';
-import { formatReadableDate, formatReadableMonth, didBoarderEatBreakfast } from '../utils';
+import { formatReadableDate, formatReadableMonth, didBoarderEatBreakfast, getDatesInMonth, getBoarderMealBreakdown } from '../utils';
 
 interface BoarderDashboardProps {
   boarder: Boarder;
@@ -115,6 +117,59 @@ export default function BoarderDashboard({
     f => f.boarderId === boarder.id && f.month === report.month
   );
   const hasSpecialMeal = (summary.specialMealCost || 0) > 0;
+
+  // Build Monthly Meal Calendar data for report.month
+  const monthDates = getDatesInMonth(report.month);
+  const [calYearStr, calMonthStr] = report.month.split('-');
+  const firstWeekdayOffset = new Date(parseInt(calYearStr, 10), parseInt(calMonthStr, 10) - 1, 1).getDay();
+  const todayIso = new Date().toISOString().split('T')[0];
+
+  const monthLogsByDate = new Map<string, DailyMealLog>();
+  mealLogs.forEach(log => {
+    if (log.date.startsWith(report.month)) {
+      monthLogsByDate.set(log.date, log);
+    }
+  });
+
+  const calendarDays = monthDates.map((dateStr, idx) => {
+    const log = monthLogsByDate.get(dateStr);
+    const total = log ? Number(log.meals?.[boarder.id] || 0) : 0;
+    const breakdown = getBoarderMealBreakdown(log, boarder.id);
+    const hasLog = Boolean(log);
+    const breakfastServings = breakdown.breakfast > 0 ? Math.round((breakdown.breakfast / 0.5) * 10) / 10 : 0;
+    return {
+      dateStr,
+      dayNumber: idx + 1,
+      hasLog,
+      total,
+      breakfast: breakdown.breakfast,
+      breakfastServings,
+      lunch: breakdown.lunch,
+      dinner: breakdown.dinner,
+      note: log?.note,
+      isToday: dateStr === todayIso,
+    };
+  });
+
+  const defaultSelectedCalDate =
+    (monthDates.includes(todayIso) ? todayIso : undefined) ||
+    calendarDays.slice().reverse().find(d => d.hasLog)?.dateStr ||
+    monthDates[0] ||
+    '';
+
+  const [selectedCalDate, setSelectedCalDate] = useState<string>(defaultSelectedCalDate);
+
+  const activeCalDay =
+    calendarDays.find(d => d.dateStr === selectedCalDate) ||
+    calendarDays.find(d => d.dateStr === defaultSelectedCalDate) ||
+    calendarDays[0];
+
+  const totalBreakfastCount = calendarDays.reduce((acc, d) => acc + (d.breakfast > 0 ? 1 : 0), 0);
+  const totalLunchCount = calendarDays.reduce((acc, d) => acc + (d.lunch > 0 ? 1 : 0), 0);
+  const totalDinnerCount = calendarDays.reduce((acc, d) => acc + (d.dinner > 0 ? 1 : 0), 0);
+  const leadingEmptyCells = Array.from({ length: firstWeekdayOffset });
+  const trailingEmptyCount = (7 - ((firstWeekdayOffset + calendarDays.length) % 7)) % 7;
+  const trailingEmptyCells = Array.from({ length: trailingEmptyCount });
 
   return (
     <div className="space-y-6 animate-fadeIn text-slate-800">
@@ -333,6 +388,230 @@ export default function BoarderDashboard({
               <CheckCircle2 className="w-4 h-4 text-amber-700 shrink-0" />
               <span>
                 <strong>Penalty Meal Fine Applied:</strong> +{myFineRecord.fineMeals} meals on {formatReadableDate(myFineRecord.dateApplied)} ({myFineRecord.note || 'Breakfast shortfall'}).
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Monthly Visual Meal Consumption Calendar */}
+      <div className="bg-white p-5 sm:p-6 rounded-xl border border-slate-200/90 space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div className="flex items-start sm:items-center gap-2.5">
+            <div className="w-9 h-9 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0">
+              <CalendarDays className="w-4 h-4 text-blue-400" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
+                Monthly Meal Calendar · {formatReadableMonth(report.month)}
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Daily Breakfast, Lunch & Dinner icons at a glance — click any day to inspect details
+              </p>
+            </div>
+          </div>
+
+          {/* Slot Legend + Monthly Slot Totals */}
+          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200/80 text-amber-800 font-semibold">
+              <Coffee className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span>Breakfast</span>
+              <span className="font-mono tabular-nums font-bold text-amber-900 ml-0.5">{totalBreakfastCount}d</span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 border border-sky-200/80 text-sky-800 font-semibold">
+              <Sun className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+              <span>Lunch</span>
+              <span className="font-mono tabular-nums font-bold text-sky-900 ml-0.5">{totalLunchCount}d</span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 border border-indigo-200/80 text-indigo-800 font-semibold">
+              <Moon className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <span>Dinner</span>
+              <span className="font-mono tabular-nums font-bold text-indigo-900 ml-0.5">{totalDinnerCount}d</span>
+            </div>
+          </div>
+        </div>
+
+        {/* 7-Column Calendar Grid */}
+        <div>
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2 mb-1.5">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayLabel) => (
+              <div
+                key={dayLabel}
+                className="text-center text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 py-1"
+              >
+                {dayLabel}
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+            {leadingEmptyCells.map((_, idx) => (
+              <div
+                key={`lead-${idx}`}
+                className="min-h-[64px] sm:min-h-[82px] rounded-lg bg-slate-50/50 border border-dashed border-slate-100"
+              />
+            ))}
+
+            {calendarDays.map((day) => {
+              const isSelected = activeCalDay?.dateStr === day.dateStr;
+              const hasBreakfast = day.breakfast > 0;
+              const hasLunch = day.lunch > 0;
+              const hasDinner = day.dinner > 0;
+              const hasExtraBreakfast = day.breakfastServings > 1;
+              const hasExtraLunch = day.lunch > 1;
+              const hasExtraDinner = day.dinner > 1;
+
+              return (
+                <button
+                  key={day.dateStr}
+                  type="button"
+                  onClick={() => setSelectedCalDate(day.dateStr)}
+                  id={`cal-day-${day.dateStr}`}
+                  title={`${formatReadableDate(day.dateStr)}: B ${day.breakfast} · L ${day.lunch} · D ${day.dinner} (Total ${day.total})`}
+                  className={`min-h-[64px] sm:min-h-[82px] p-1.5 sm:p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-blue-50/50 border-blue-500 ring-1 ring-blue-500/30'
+                      : day.isToday
+                        ? 'bg-slate-50 border-slate-400 hover:border-slate-500'
+                        : day.total > 0
+                          ? 'bg-white border-slate-200/90 hover:border-slate-300'
+                          : 'bg-slate-50/60 border-slate-200/60 hover:border-slate-300'
+                  }`}
+                >
+                  {/* Day Number + Daily Total Badge */}
+                  <div className="flex items-center justify-between gap-1 w-full">
+                    <span className={`font-mono tabular-nums text-[11px] sm:text-xs font-bold leading-none ${
+                      day.isToday
+                        ? 'text-blue-700'
+                        : day.total > 0
+                          ? 'text-slate-800'
+                          : 'text-slate-400'
+                    }`}>
+                      {day.dayNumber}
+                    </span>
+
+                    {day.total > 0 ? (
+                      <span className="font-mono tabular-nums text-[9px] sm:text-[10px] font-bold px-1 sm:px-1.5 py-0.5 rounded bg-slate-900 text-white leading-none">
+                        {day.total}
+                      </span>
+                    ) : day.hasLog ? (
+                      <span className="font-mono tabular-nums text-[9px] text-slate-400 leading-none">
+                        0
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {/* Meal Slot Icons Row: Breakfast, Lunch, Dinner */}
+                  <div className="grid grid-cols-3 gap-0.5 sm:gap-1 w-full mt-1.5">
+                    {/* Breakfast Icon */}
+                    <div
+                      className={`relative flex items-center justify-center py-1 rounded border ${
+                        hasBreakfast
+                          ? 'bg-amber-50 border-amber-200 text-amber-700'
+                          : 'bg-slate-100/60 border-slate-100 text-slate-300'
+                      }`}
+                      title={`Breakfast: ${day.breakfast}${hasExtraBreakfast ? ` (${day.breakfastServings}x)` : ''}`}
+                    >
+                      <Coffee className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                      {hasExtraBreakfast && (
+                        <span className="hidden sm:inline-block ml-0.5 text-[9px] font-mono font-extrabold leading-none">
+                          {day.breakfastServings}×
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Lunch Icon */}
+                    <div
+                      className={`relative flex items-center justify-center py-1 rounded border ${
+                        hasLunch
+                          ? 'bg-sky-50 border-sky-200 text-sky-700'
+                          : 'bg-slate-100/60 border-slate-100 text-slate-300'
+                      }`}
+                      title={`Lunch: ${day.lunch}`}
+                    >
+                      <Sun className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                      {hasExtraLunch && (
+                        <span className="hidden sm:inline-block ml-0.5 text-[9px] font-mono font-extrabold leading-none">
+                          {day.lunch}×
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Dinner Icon */}
+                    <div
+                      className={`relative flex items-center justify-center py-1 rounded border ${
+                        hasDinner
+                          ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                          : 'bg-slate-100/60 border-slate-100 text-slate-300'
+                      }`}
+                      title={`Dinner: ${day.dinner}`}
+                    >
+                      <Moon className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0" />
+                      {hasExtraDinner && (
+                        <span className="hidden sm:inline-block ml-0.5 text-[9px] font-mono font-extrabold leading-none">
+                          {day.dinner}×
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+
+            {trailingEmptyCells.map((_, idx) => (
+              <div
+                key={`trail-${idx}`}
+                className="min-h-[64px] sm:min-h-[82px] rounded-lg bg-slate-50/50 border border-dashed border-slate-100"
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Selected Day Inspector Bar */}
+        {activeCalDay && (
+          <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <span className="font-mono font-bold text-xs text-slate-900 bg-white border border-slate-200 px-2.5 py-1 rounded-md shrink-0">
+                {formatReadableDate(activeCalDay.dateStr)}
+              </span>
+              {activeCalDay.note ? (
+                <span className="text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded truncate">
+                  {activeCalDay.note}
+                </span>
+              ) : (
+                <span className="text-xs text-slate-500">
+                  {activeCalDay.hasLog ? 'Daily consumption breakdown' : 'No meal entry logged for this date'}
+                </span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-xs font-mono tabular-nums shrink-0">
+              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border ${
+                activeCalDay.breakfast > 0
+                  ? 'bg-amber-50 border-amber-200 text-amber-800 font-semibold'
+                  : 'bg-white border-slate-200 text-slate-400'
+              }`}>
+                <Coffee className="w-3.5 h-3.5 text-amber-600" />
+                <span>B: {activeCalDay.breakfast}{activeCalDay.breakfastServings > 1 ? ` (${activeCalDay.breakfastServings}×)` : ''}</span>
+              </span>
+              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border ${
+                activeCalDay.lunch > 0
+                  ? 'bg-sky-50 border-sky-200 text-sky-800 font-semibold'
+                  : 'bg-white border-slate-200 text-slate-400'
+              }`}>
+                <Sun className="w-3.5 h-3.5 text-sky-600" />
+                <span>L: {activeCalDay.lunch}</span>
+              </span>
+              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-md border ${
+                activeCalDay.dinner > 0
+                  ? 'bg-indigo-50 border-indigo-200 text-indigo-800 font-semibold'
+                  : 'bg-white border-slate-200 text-slate-400'
+              }`}>
+                <Moon className="w-3.5 h-3.5 text-indigo-600" />
+                <span>D: {activeCalDay.dinner}</span>
+              </span>
+              <span className="inline-flex items-center px-2.5 py-1 rounded-md bg-slate-900 text-white font-bold">
+                Total: {activeCalDay.total}
               </span>
             </div>
           </div>
