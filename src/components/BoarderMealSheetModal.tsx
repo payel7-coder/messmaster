@@ -15,7 +15,7 @@ import {
   UserCheck
 } from 'lucide-react';
 import { Boarder, DailyMealLog, MessSettings, MonthReport } from '../types';
-import { formatReadableMonth } from '../utils';
+import { formatReadableMonth, compareBoardersByRoom } from '../utils';
 import { generateBoardersMealSheetPdf } from '../utils/pdfGenerator';
 
 interface BoarderMealSheetModalProps {
@@ -45,6 +45,7 @@ export default function BoarderMealSheetModal({
   );
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'room' | 'name'>('room');
   const [copiedWhatsApp, setCopiedWhatsApp] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
@@ -64,15 +65,23 @@ export default function BoarderMealSheetModal({
     return dayNumbers.map(d => `${settings.currentMonth}-${d < 10 ? '0' + d : d}`);
   }, [dayNumbers, settings.currentMonth]);
 
-  // Filter and sort boarders
+  // Filter and sort boarders (defaults to Room Number order)
   const filteredBoarders = useMemo(() => {
     let list = includeInactive ? [...boarders] : boarders.filter(b => b.isActive);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      list = list.filter(b => b.name.toLowerCase().includes(q) || (b.phone && b.phone.includes(q)));
+      list = list.filter(b =>
+        b.name.toLowerCase().includes(q) ||
+        (b.roomNo && b.roomNo.toLowerCase().includes(q)) ||
+        (b.phone && b.phone.includes(q))
+      );
     }
-    return list.sort((a, b) => a.name.localeCompare(b.name));
-  }, [boarders, includeInactive, searchQuery]);
+    return list.sort(
+      sortBy === 'name'
+        ? (a, b) => a.name.localeCompare(b.name)
+        : compareBoardersByRoom
+    );
+  }, [boarders, includeInactive, searchQuery, sortBy]);
 
   // Precompute totals
   const mealRate = report?.mealRate || 0;
@@ -130,6 +139,7 @@ export default function BoarderMealSheetModal({
         {
           includeInactive,
           includeMealCost,
+          sortBy,
           managerName,
           managerPhone,
           customNotes,
@@ -166,7 +176,8 @@ export default function BoarderMealSheetModal({
     filteredBoarders.forEach((b, idx) => {
       const total = boarderTotals[b.id] || 0;
       const cost = total * mealRate;
-      msg += `${idx + 1}. *${b.name}* (${b.isActive ? 'Active' : 'Inactive'}): ${total.toFixed(1)} meals`;
+      const roomTag = b.roomNo ? `[${b.roomNo}] ` : '';
+      msg += `${idx + 1}. ${roomTag}*${b.name}* (${b.isActive ? 'Active' : 'Inactive'}): ${total.toFixed(1)} meals`;
       if (mealRate > 0 && includeMealCost) {
         msg += ` = ৳${cost.toFixed(2)}`;
       }
@@ -279,7 +290,7 @@ export default function BoarderMealSheetModal({
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Filter boarders..."
+                  placeholder="Filter name or room..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -287,8 +298,8 @@ export default function BoarderMealSheetModal({
               </div>
             </div>
 
-            {/* Checkbox Toggles */}
-            <div className="md:col-span-4 flex items-center gap-4">
+            {/* Checkbox Toggles & Sort Order */}
+            <div className="md:col-span-4 flex flex-wrap items-center gap-3">
               <label className="flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer">
                 <input
                   type="checkbox"
@@ -296,7 +307,7 @@ export default function BoarderMealSheetModal({
                   onChange={(e) => setIncludeMealCost(e.target.checked)}
                   className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
-                Show Meal Cost Column
+                Meal Cost
               </label>
 
               <label className="flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer">
@@ -306,8 +317,21 @@ export default function BoarderMealSheetModal({
                   onChange={(e) => setIncludeInactive(e.target.checked)}
                   className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
-                Include Inactive Boarders
+                Inactive
               </label>
+
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-slate-500 font-medium">Sort:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as 'room' | 'name')}
+                  id="select-meal-sheet-sort"
+                  className="bg-white border border-slate-200 rounded-md px-2 py-1 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                >
+                  <option value="room">Room No.</option>
+                  <option value="name">Name (A–Z)</option>
+                </select>
+              </div>
             </div>
 
             {/* Manager Name & Phone */}
@@ -384,8 +408,9 @@ export default function BoarderMealSheetModal({
               <table className="w-full text-center border-collapse text-[11px]">
                 <thead>
                   <tr className="bg-slate-800 text-white font-bold text-[10px] divide-x divide-slate-700">
-                    <th className="py-2.5 px-2 w-8 text-center sticky left-0 z-20 bg-slate-800">#</th>
-                    <th className="py-2.5 px-3 text-left w-40 sticky left-8 z-20 bg-slate-800 shadow-sm">
+                    <th className="py-2.5 px-2 min-w-[32px] w-8 text-center sticky left-0 z-20 bg-slate-800">#</th>
+                    <th className="py-2.5 px-2 min-w-[80px] w-20 text-center sticky left-8 z-20 bg-slate-800">Room</th>
+                    <th className="py-2.5 px-3 text-left min-w-[150px] w-40 sticky left-28 z-20 bg-slate-800 shadow-sm">
                       Boarder Name
                     </th>
                     {dayNumbers.map(d => {
@@ -420,7 +445,7 @@ export default function BoarderMealSheetModal({
                 <tbody className="divide-y divide-slate-100 text-slate-700">
                   {filteredBoarders.length === 0 ? (
                     <tr>
-                      <td colSpan={dayNumbers.length + (includeMealCost ? 4 : 3)} className="py-8 text-center text-slate-400 text-xs">
+                      <td colSpan={dayNumbers.length + (includeMealCost ? 5 : 4)} className="py-8 text-center text-slate-400 text-xs">
                         No boarders matched the selected criteria.
                       </td>
                     </tr>
@@ -438,15 +463,13 @@ export default function BoarderMealSheetModal({
                           <td className="py-1.5 px-1 text-slate-400 text-center font-mono text-[10px] sticky left-0 bg-inherit z-10">
                             {idx + 1}
                           </td>
-                          <td className="py-1.5 px-3 text-left font-medium text-slate-900 sticky left-8 bg-inherit z-10 shadow-xs whitespace-nowrap">
-                            <span className="truncate max-w-[130px] inline-block align-middle font-semibold">
+                          <td className="py-1.5 px-2 text-center font-mono font-bold text-[10.5px] text-blue-700 sticky left-8 bg-inherit z-10 whitespace-nowrap">
+                            {b.roomNo || '—'}
+                          </td>
+                          <td className="py-1.5 px-3 text-left font-medium text-slate-900 sticky left-28 bg-inherit z-10 shadow-xs whitespace-nowrap">
+                            <span className="truncate max-w-[140px] inline-block align-middle font-semibold">
                               {b.name}
                             </span>
-                            {b.roomNo && (
-                              <span className="ml-1 text-[9px] text-slate-500 font-mono font-normal">
-                                ({b.roomNo})
-                              </span>
-                            )}
                             {!b.isActive && (
                               <span className="ml-1.5 text-[9px] bg-slate-100 text-slate-500 px-1 py-0.2 rounded font-normal">
                                 Inact.
@@ -491,7 +514,7 @@ export default function BoarderMealSheetModal({
                 {/* Footer Totals Row */}
                 <tfoot>
                   <tr className="bg-slate-100 text-slate-900 font-bold border-t-2 border-slate-300 divide-x divide-slate-200">
-                    <td colSpan={2} className="py-2.5 px-3 text-left uppercase text-[10px] tracking-wider sticky left-0 z-10 bg-slate-100 shadow-xs">
+                    <td colSpan={3} className="py-2.5 px-3 text-left uppercase text-[10px] tracking-wider sticky left-0 z-10 bg-slate-100 shadow-xs">
                       Daily Total Meals
                     </td>
                     {dailyTotals.map((dayTotal, i) => (

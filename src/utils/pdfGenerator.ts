@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, BoarderSummary } from '../types';
-import { formatReadableDate, formatReadableMonth } from '../utils';
+import { formatReadableDate, formatReadableMonth, compareBoardersByRoom } from '../utils';
 import { NOTO_SANS_BENGALI_REGULAR, NOTO_SANS_BENGALI_BOLD } from './bengaliFontData';
 import { shapeBengaliText, shapeBengaliTableData } from './bengaliShaper';
 
@@ -722,6 +722,7 @@ export function generateMonthlyReportPdf(
 export interface MealSheetPdfOptions {
   includeInactive?: boolean;
   includeMealCost?: boolean;
+  sortBy?: 'room' | 'name';
   managerName?: string;
   managerPhone?: string;
   customNotes?: string;
@@ -737,6 +738,7 @@ export function generateBoardersMealSheetPdf(
   const {
     includeInactive = true,
     includeMealCost = true,
+    sortBy = 'room',
     managerName = 'Mess Manager',
     managerPhone = '',
     customNotes = 'Legend: 1 = Single Meal, 2 = Double Meals, 2.5 = Full Day (0.5 Breakfast + 1 Lunch + 1 Dinner), - = Meal Off. Verify all counts before month closing.',
@@ -755,10 +757,14 @@ export function generateBoardersMealSheetPdf(
   const pageHeight = doc.internal.pageSize.getHeight();
   const activeMonthStr = formatReadableMonth(settings.currentMonth);
 
-  // Filter boarders
+  // Filter & sort boarders (defaults to room number order)
+  const sorter = sortBy === 'name'
+    ? (a: Boarder, b: Boarder) => a.name.localeCompare(b.name)
+    : compareBoardersByRoom;
+
   const boardersToInclude = includeInactive
-    ? [...boarders].sort((a, b) => a.name.localeCompare(b.name))
-    : boarders.filter(b => b.isActive).sort((a, b) => a.name.localeCompare(b.name));
+    ? [...boarders].sort(sorter)
+    : boarders.filter(b => b.isActive).sort(sorter);
 
   // Dates in the current month
   const [yearStr, monthStr] = settings.currentMonth.split('-');
@@ -865,15 +871,15 @@ export function generateBoardersMealSheetPdf(
   currentY += statBoxHeight + 3.5;
 
   // Matrix Table
-  const tableHeaders = ['#', 'Boarder Name', ...dayNumbers.map(d => `${d}`), 'Total'];
+  const tableHeaders = ['#', 'Room', 'Boarder Name', ...dayNumbers.map(d => `${d}`), 'Total'];
   if (includeMealCost) {
     tableHeaders.push('Cost (৳)');
   }
 
   const tableRows = boardersToInclude.map((b, idx) => {
-    const room = b.roomNo ? ` [${b.roomNo}]` : '';
+    const roomLabel = b.roomNo?.trim() || '—';
     const status = b.isActive ? '' : ' (Inact.)';
-    const row: string[] = [(idx + 1).toString(), `${b.name}${room}${status}`];
+    const row: string[] = [(idx + 1).toString(), roomLabel, `${b.name}${status}`];
 
     dateStrings.forEach(date => {
       const log = mealLogs.find(l => l.date === date);
@@ -899,7 +905,7 @@ export function generateBoardersMealSheetPdf(
   });
 
   // Daily Totals Footer Row
-  const footerRow: string[] = ['', 'DAILY TOTALS'];
+  const footerRow: string[] = ['', '', 'DAILY TOTALS'];
   dailyTotals.forEach(dayTotal => {
     if (dayTotal === 0) {
       footerRow.push('-');
@@ -916,22 +922,24 @@ export function generateBoardersMealSheetPdf(
   }
 
   const slWidth = 7;
-  const nameWidth = 34;
+  const roomWidth = 14;
+  const nameWidth = 28;
   const totalColWidth = 14;
   const costColWidth = includeMealCost ? 17 : 0;
-  const fixedWidths = slWidth + nameWidth + totalColWidth + costColWidth;
+  const fixedWidths = slWidth + roomWidth + nameWidth + totalColWidth + costColWidth;
   const dayColWidth = (pageWidth - 24 - fixedWidths) / daysInMonth;
 
   const columnStyles: Record<number, any> = {
     0: { cellWidth: slWidth, halign: 'center' },
-    1: { cellWidth: nameWidth, fontStyle: 'bold' },
+    1: { cellWidth: roomWidth, halign: 'center', fontStyle: 'bold' },
+    2: { cellWidth: nameWidth, fontStyle: 'bold' },
   };
 
   for (let i = 0; i < daysInMonth; i++) {
-    columnStyles[2 + i] = { cellWidth: dayColWidth, halign: 'center' };
+    columnStyles[3 + i] = { cellWidth: dayColWidth, halign: 'center' };
   }
 
-  const totalColIndex = 2 + daysInMonth;
+  const totalColIndex = 3 + daysInMonth;
   columnStyles[totalColIndex] = {
     cellWidth: totalColWidth,
     halign: 'center',
@@ -975,7 +983,10 @@ export function generateBoardersMealSheetPdf(
         data.cell.styles.fillColor = [241, 245, 249];
         data.cell.styles.textColor = [15, 23, 42];
       }
-      if (data.section === 'body' && data.column.index >= 2 && data.column.index < 2 + daysInMonth) {
+      if (data.section === 'body' && data.column.index === 1 && data.row.index < tableRows.length) {
+        data.cell.styles.textColor = [37, 99, 235];
+      }
+      if (data.section === 'body' && data.column.index >= 3 && data.column.index < 3 + daysInMonth) {
         const text = data.cell.text[0];
         if (text === '-') {
           data.cell.styles.textColor = [148, 163, 184];

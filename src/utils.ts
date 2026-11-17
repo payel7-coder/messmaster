@@ -273,3 +273,26 @@ export function getBreakfastMealCount(log: DailyMealLog | undefined, boarderId: 
   return rem >= 0.45 && rem <= 0.55 ? 0.5 : 0;
 }
 
+/**
+ * Sorts boarders naturally by room number (e.g. "9", "Room 101", "102", "201-B"),
+ * placing boarders without a room number at the end, and breaking ties by name.
+ */
+export function compareBoardersByRoom(a: Boarder, b: Boarder): number {
+  const rawA = (a.roomNo || '').trim();
+  const rawB = (b.roomNo || '').trim();
+
+  if (!rawA && !rawB) return a.name.localeCompare(b.name);
+  if (!rawA) return 1;
+  if (!rawB) return -1;
+
+  const normA = rawA.replace(/^room\s*[-:#.]?\s*/i, '');
+  const normB = rawB.replace(/^room\s*[-:#.]?\s*/i, '');
+
+  const normCmp = normA.localeCompare(normB, undefined, { numeric: true, sensitivity: 'base' });
+  if (normCmp !== 0) return normCmp;
+
+  const rawCmp = rawA.localeCompare(rawB, undefined, { numeric: true, sensitivity: 'base' });
+  if (rawCmp !== 0) return rawCmp;
+
+  return a.name.localeCompare(b.name);
+}
