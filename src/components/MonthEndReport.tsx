@@ -18,7 +18,8 @@ import {
   Sparkles,
   ArrowRightLeft,
   History,
-  CalendarCheck
+  CalendarCheck,
+  Database
 } from 'lucide-react';
 import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport } from '../types';
 import { formatReadableMonth } from '../utils';
@@ -64,7 +65,28 @@ export default function MonthEndReport({
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [showMealSheetModal, setShowMealSheetModal] = useState(false);
   const [showDepositStatementModal, setShowDepositStatementModal] = useState(false);
+  const [openHubMenu, setOpenHubMenu] = useState<'pdfs' | 'data' | null>(null);
+  const hubMenuRef = useRef<HTMLDivElement>(null);
   const hasSpecialFeast = (report.totalSpecialMealCost || 0) > 0;
+
+  React.useEffect(() => {
+    const handleOutside = (e: MouseEvent) => {
+      if (hubMenuRef.current && !hubMenuRef.current.contains(e.target as Node)) {
+        setOpenHubMenu(null);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenHubMenu(null);
+    };
+    if (openHubMenu) {
+      document.addEventListener('mousedown', handleOutside);
+      document.addEventListener('keydown', handleEsc);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [openHubMenu]);
 
   // State for tracking which boarders' step-by-step calculations are expanded
   const [expandedBoarders, setExpandedBoarders] = useState<Record<string, boolean>>({});
@@ -182,7 +204,7 @@ export default function MonthEndReport({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div ref={hubMenuRef} className="flex flex-wrap items-center gap-2">
           {/* ONLY MANAGERS CAN SEE MEAL SHEET PDF, MONTHLY AUDIT PDF, AND DIRECT PRINT OPTIONS */}
           {isManager ? (
             <>
@@ -199,66 +221,158 @@ export default function MonthEndReport({
                 </button>
               )}
 
-              <button
-                onClick={() => setShowMealSheetModal(true)}
-                id="btn-generate-meal-sheet-modal"
-                className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
-                title="Generate & export the full monthly 31-day meal sheet of all boarders"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Meal Sheet PDF</span>
-              </button>
+              {/* Grouped PDF Export Menu */}
+              <div className="relative">
+                <button
+                  type="button"
+                  id="btn-report-export-pdfs-menu"
+                  onClick={() => setOpenHubMenu(prev => (prev === 'pdfs' ? null : 'pdfs'))}
+                  className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
+                >
+                  <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Export PDFs</span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${openHubMenu === 'pdfs' ? 'rotate-180' : ''}`} />
+                </button>
 
-              <button
-                onClick={() => setShowDepositStatementModal(true)}
-                id="btn-report-deposit-statement-pdf"
-                className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
-                title="Generate & export deposit statement PDF of all boarders"
-              >
-                <DollarSign className="w-3.5 h-3.5 text-amber-400" />
-                <span>Deposit PDF</span>
-              </button>
+                {openHubMenu === 'pdfs' && (
+                  <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-64 bg-white border border-slate-200/90 rounded-xl shadow-xl py-1.5 z-40 animate-scaleIn">
+                    <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                      PDF Statements
+                    </div>
 
-              <button
-                onClick={() => setShowPdfModal(true)}
-                id="btn-generate-pdf-modal"
-                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>Monthly Audit PDF</span>
-              </button>
+                    <button
+                      type="button"
+                      id="btn-generate-pdf-modal"
+                      onClick={() => {
+                        setOpenHubMenu(null);
+                        setShowPdfModal(true);
+                      }}
+                      className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-slate-50 cursor-pointer transition-colors"
+                    >
+                      <FileText className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                      <div>
+                        <div className="text-xs font-semibold text-slate-900">Monthly Audit PDF</div>
+                        <div className="text-[11px] text-slate-500">Preview & customize member slips</div>
+                      </div>
+                    </button>
 
-              <button
-                onClick={handleDownloadReportPdf}
-                disabled={isDownloadingPdf}
-                id="btn-download-pdf-direct"
-                className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors disabled:opacity-50 whitespace-nowrap shrink-0"
-                title="Directly download monthly audit PDF report with 4 vouchers per page"
-              >
-                <Download className="w-3.5 h-3.5 text-blue-600" />
-                <span>{isDownloadingPdf ? 'Downloading…' : 'Download PDF'}</span>
-              </button>
+                    <button
+                      type="button"
+                      id="btn-download-pdf-direct"
+                      disabled={isDownloadingPdf}
+                      onClick={() => {
+                        setOpenHubMenu(null);
+                        handleDownloadReportPdf();
+                      }}
+                      className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-slate-50 cursor-pointer transition-colors disabled:opacity-50"
+                    >
+                      <Download className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                      <div>
+                        <div className="text-xs font-semibold text-slate-900">
+                          {isDownloadingPdf ? 'Downloading…' : 'Quick Download Audit PDF'}
+                        </div>
+                        <div className="text-[11px] text-slate-500">Instant save with vouchers</div>
+                      </div>
+                    </button>
 
-              <button
-                onClick={handleExportBackup}
-                id="btn-export-json"
-                className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
-              >
-                <Download className="w-3.5 h-3.5 text-slate-500" />
-                <span>Backup JSON</span>
-              </button>
+                    <button
+                      type="button"
+                      id="btn-generate-meal-sheet-modal"
+                      onClick={() => {
+                        setOpenHubMenu(null);
+                        setShowMealSheetModal(true);
+                      }}
+                      className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-slate-50 cursor-pointer transition-colors"
+                    >
+                      <FileSpreadsheet className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                      <div>
+                        <div className="text-xs font-semibold text-slate-900">Meal Sheet PDF</div>
+                        <div className="text-[11px] text-slate-500">31-day attendance by room no.</div>
+                      </div>
+                    </button>
 
-              <button
-                onClick={() => {
-                  fileInputRef.current?.click();
-                }}
-                id="btn-import-json"
-                className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
-                title="Restore database backup from JSON file"
-              >
-                <Upload className="w-3.5 h-3.5 text-slate-500" />
-                <span>Restore</span>
-              </button>
+                    <button
+                      type="button"
+                      id="btn-report-deposit-statement-pdf"
+                      onClick={() => {
+                        setOpenHubMenu(null);
+                        setShowDepositStatementModal(true);
+                      }}
+                      className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-slate-50 cursor-pointer transition-colors"
+                    >
+                      <DollarSign className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                      <div>
+                        <div className="text-xs font-semibold text-slate-900">Deposit Statement PDF</div>
+                        <div className="text-[11px] text-slate-500">All boarders cash & balances</div>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Grouped Data & Backup Menu */}
+              <div className="relative">
+                <button
+                  type="button"
+                  id="btn-report-data-backup-menu"
+                  onClick={() => setOpenHubMenu(prev => (prev === 'data' ? null : 'data'))}
+                  className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
+                >
+                  <Database className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Data & Backup</span>
+                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${openHubMenu === 'data' ? 'rotate-180' : ''}`} />
+                </button>
+
+                {openHubMenu === 'data' && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200/90 rounded-xl shadow-xl py-1.5 z-40 animate-scaleIn">
+                    <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                      Backup & Maintenance
+                    </div>
+
+                    <button
+                      type="button"
+                      id="btn-export-json"
+                      onClick={() => {
+                        setOpenHubMenu(null);
+                        handleExportBackup();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer transition-colors"
+                    >
+                      <Download className="w-4 h-4 text-slate-500 shrink-0" />
+                      <span>Backup JSON</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      id="btn-import-json"
+                      onClick={() => {
+                        setOpenHubMenu(null);
+                        fileInputRef.current?.click();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer transition-colors"
+                    >
+                      <Upload className="w-4 h-4 text-slate-500 shrink-0" />
+                      <span>Restore from JSON</span>
+                    </button>
+
+                    <div className="my-1 border-t border-slate-100" />
+
+                    <button
+                      type="button"
+                      id="btn-clear-month"
+                      onClick={() => {
+                        setOpenHubMenu(null);
+                        onClearData();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-rose-50 text-xs font-semibold text-rose-700 cursor-pointer transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>Wipe Month Data</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <input
                 type="file"
                 ref={fileInputRef}
@@ -266,16 +380,6 @@ export default function MonthEndReport({
                 accept=".json"
                 className="hidden"
               />
-
-              <button
-                onClick={onClearData}
-                id="btn-clear-month"
-                className="flex items-center gap-1.5 bg-white hover:bg-rose-50 text-rose-700 font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors border border-rose-200 whitespace-nowrap shrink-0"
-                title="Wipe data from Google Cloud Firestore and local storage"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                <span>Wipe</span>
-              </button>
             </>
           ) : (
             <div className="flex items-center gap-2">

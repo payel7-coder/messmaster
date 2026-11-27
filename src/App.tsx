@@ -36,7 +36,7 @@ import {
   EyeOff
 } from 'lucide-react';
 
-import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, RegisteredManager, MonthClosureRecord } from './types';
+import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, RegisteredManager, MonthClosureRecord, QuickManagerAction } from './types';
 import { calculateReport, formatReadableMonth } from './utils';
 import { INITIAL_SETTINGS, INITIAL_MISC_COSTS, generateSampleData } from './data';
 import { testFirestoreConnection, auth, signOutManager } from './firebase';
@@ -97,6 +97,7 @@ export default function App() {
   
   const [selectedBoarderId, setSelectedBoarderId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const [pendingManagerAction, setPendingManagerAction] = useState<{ action: QuickManagerAction; nonce: number } | null>(null);
 
   // --- Core Application State (Synchronized with Firestore as single source of truth) ---
   const [boarders, setBoarders] = useState<Boarder[]>(() => {
@@ -813,6 +814,21 @@ export default function App() {
     setTimeout(() => setCloudToast(null), 6000);
   };
 
+  // --- Quick Action Dispatcher (from Mobile Menu Bar / Shortcuts) ---
+  const handleQuickManagerAction = (action: QuickManagerAction) => {
+    if (!isManagerAuthenticated) {
+      handleRequireManagerLogin();
+      return;
+    }
+    if (action === 'handover') {
+      setShowHandoverModal(true);
+      return;
+    }
+    setRole('manager');
+    setActiveTab('dashboard');
+    setPendingManagerAction({ action, nonce: Date.now() });
+  };
+
   // Check if there is active data logged for the active month
   const activeMonth = settings.currentMonth;
   const hasActiveMonthData = 
@@ -840,17 +856,57 @@ export default function App() {
         googleUser={googleUser}
         onRequireManagerLogin={handleRequireManagerLogin}
         onManagerLogout={handleManagerLogout}
+        activeTab={activeTab}
         onNavigateTab={(tab) => setActiveTab(tab)}
         hideBoardersWithoutPin={Boolean(settings.hideBoardersWithoutPin)}
         isSelectedBoarderUnlocked={Boolean(selectedBoarder && unlockedBoarderIds[selectedBoarder.id])}
         onLockBoarder={() => handleLockBoarderStatement(selectedBoarder?.id)}
+        isCloudSynced={isCloudSynced}
+        isCloudLoading={isCloudLoading}
+        onOpenCloudModal={() => setShowCloudModal(true)}
+        onQuickManagerAction={handleQuickManagerAction}
       />
 
       {/* Main Core Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 print:py-0 print:px-0">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 print:py-0 print:px-0">
         
-        {/* Workspace Sub-Navigation Strip */}
-        <div className="print:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border-b border-slate-200/90">
+        {/* Mobile Active Section Strip (All navigation & tools live in Mobile Menu Bar above) */}
+        <div className="flex md:hidden items-center justify-between gap-2 pb-3 mb-4 border-b border-slate-200/80 print:hidden">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
+            <span className="text-xs font-bold text-slate-800 truncate">
+              {activeTab === 'dashboard'
+                ? role === 'manager'
+                  ? 'Manager Console'
+                  : 'My Statement'
+                : activeTab === 'analytics'
+                ? 'Analytics & Trends'
+                : activeTab === 'report'
+                ? 'Month-End Bills & Memos'
+                : 'Mess Settings'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {role === 'manager' && isManagerAuthenticated && (
+              <button
+                type="button"
+                onClick={() => setShowCloudModal(true)}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold border cursor-pointer whitespace-nowrap ${
+                  isCloudSynced
+                    ? 'bg-white text-slate-700 border-slate-200'
+                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                }`}
+              >
+                <Cloud className={`w-3 h-3 ${isCloudSynced ? 'text-emerald-600' : 'text-amber-600'}`} />
+                <span>{isCloudLoading ? 'Syncing…' : isCloudSynced ? 'Synced' : 'Offline'}</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Desktop Workspace Sub-Navigation Strip */}
+        <div className="hidden md:flex print:hidden items-center justify-between gap-3 mb-6 border-b border-slate-200/90">
           
           {/* Primary Workspace Views */}
           <nav className="flex items-center gap-1 overflow-x-auto -mb-px">
@@ -913,7 +969,7 @@ export default function App() {
 
           {/* Cloud Firestore Status Control */}
           {role === 'manager' && isManagerAuthenticated && (
-            <div className="flex items-center gap-2 pb-2.5 sm:pb-0 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => setShowCloudModal(true)}
                 id="btn-cloud-sync-status"
@@ -964,6 +1020,7 @@ export default function App() {
                   settings={settings}
                   setSettings={setSettings}
                   report={report}
+                  pendingManagerAction={pendingManagerAction}
                   onOpenHandoverModal={() => setShowHandoverModal(true)}
                 />
               ) : (

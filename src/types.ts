@@ -172,3 +172,18 @@ export interface MonthReport {
   boardersReport: BoarderSummary[];
   specialMeals?: SpecialMeal[];
 }
+
+export type QuickManagerAction =
+  | 'meals'
+  | 'bazaar'
+  | 'deposits'
+  | 'fixed'
+  | 'boarders'
+  | 'analytics'
+  | 'meal-sheet-pdf'
+  | 'deposit-pdf'
+  | 'financial-pdf'
+  | 'special-feast'
+  | 'handover'
+  | 'security-pin';
+

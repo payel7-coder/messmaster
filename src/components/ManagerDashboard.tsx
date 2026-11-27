@@ -36,9 +36,11 @@ import {
   BarChart3,
   ArrowRightLeft,
   Eye,
-  EyeOff
+  EyeOff,
+  ChevronDown,
+  SlidersHorizontal
 } from 'lucide-react';
-import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, CustomFixedBill, StandardFixedBillKey, SpecialMeal, MealBreakdown } from '../types';
+import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSettings, MonthReport, CustomFixedBill, StandardFixedBillKey, SpecialMeal, MealBreakdown, QuickManagerAction } from '../types';
 import { getDatesInMonth, formatReadableDate, formatReadableMonth, didBoarderEatBreakfast, getBoarderMealBreakdown } from '../utils';
 import PrintablePdfReportModal from './PrintablePdfReportModal';
 import BoarderMealSheetModal from './BoarderMealSheetModal';
@@ -74,6 +76,7 @@ interface ManagerDashboardProps {
   setSettings: React.Dispatch<React.SetStateAction<MessSettings>>;
   report: MonthReport;
   initialTab?: TabType;
+  pendingManagerAction?: { action: QuickManagerAction; nonce: number } | null;
   onOpenHandoverModal?: () => void;
 }
 
@@ -94,6 +97,7 @@ export default function ManagerDashboard({
   setSettings,
   report,
   initialTab = 'meals',
+  pendingManagerAction,
   onOpenHandoverModal,
 }: ManagerDashboardProps) {
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
@@ -105,6 +109,53 @@ export default function ManagerDashboard({
   const [showPinModal, setShowPinModal] = useState(false);
   const [dashboardPinInput, setDashboardPinInput] = useState(settings.managerPin || '1234');
   const [dashboardPinSuccess, setDashboardPinSuccess] = useState(false);
+  const [openHeaderMenu, setOpenHeaderMenu] = useState<'pdfs' | 'tools' | 'mobile-more' | null>(null);
+  const headerMenuRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleOutside = (e: MouseEvent) => {
+      if (headerMenuRef.current && !headerMenuRef.current.contains(e.target as Node)) {
+        setOpenHeaderMenu(null);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpenHeaderMenu(null);
+    };
+    if (openHeaderMenu) {
+      document.addEventListener('mousedown', handleOutside);
+      document.addEventListener('keydown', handleEsc);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [openHeaderMenu]);
+
+  useEffect(() => {
+    if (!pendingManagerAction) return;
+    const { action } = pendingManagerAction;
+    if (action === 'meals' || action === 'bazaar' || action === 'deposits' || action === 'fixed' || action === 'boarders' || action === 'analytics') {
+      setActiveTab(action);
+      setTimeout(() => {
+        const el = document.getElementById(`tab-${action}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }, 60);
+    } else if (action === 'meal-sheet-pdf') {
+      setShowMealSheetModal(true);
+    } else if (action === 'deposit-pdf') {
+      setShowDepositStatementModal(true);
+    } else if (action === 'financial-pdf') {
+      setShowPdfModal(true);
+    } else if (action === 'special-feast') {
+      setShowSpecialMealModal(true);
+    } else if (action === 'security-pin') {
+      setDashboardPinInput('');
+      setDashboardPinSuccess(false);
+      setShowPinModal(true);
+    } else if (action === 'handover' && onOpenHandoverModal) {
+      onOpenHandoverModal();
+    }
+  }, [pendingManagerAction, onOpenHandoverModal]);
 
   // Active month's special meals / feasts
   const monthSpecialMeals = useMemo(() => {
@@ -1069,108 +1120,329 @@ export default function ManagerDashboard({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setActiveTab('bazaar')}
-            id="btn-quick-daily-cost"
-            className="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Daily Cost</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('deposits')}
-            id="btn-quick-deposit"
-            className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
-          >
-            <Plus className="w-3.5 h-3.5 text-slate-500" />
-            <span>Deposit</span>
-          </button>
-
-          <button
-            onClick={() => setShowSpecialMealModal(true)}
-            id="btn-manager-special-meal"
-            className="flex items-center justify-center gap-1.5 bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
-            title="Manage Special Feast / Meal costs distributed strictly among participating boarders (excluded from regular meal rate)"
-          >
-            <UtensilsCrossed className="w-3.5 h-3.5 text-purple-600" />
-            <span>Special Feast</span>
-            {monthSpecialMeals.length > 0 && (
-              <span className="bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md font-mono tabular-nums leading-none">
-                {monthSpecialMeals.length}
-              </span>
-            )}
-          </button>
-
-          {onOpenHandoverModal && (
+        <div ref={headerMenuRef} className="relative">
+          {/* Desktop Structured Option Groups */}
+          <div className="hidden md:flex items-center gap-2">
             <button
-              onClick={onOpenHandoverModal}
-              id="btn-manager-handover"
-              className="flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
-              title="Close month, settle balances, and handover management to new manager"
+              onClick={() => setActiveTab('bazaar')}
+              id="btn-quick-daily-cost"
+              className="flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
             >
-              <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-100" />
-              <span>Close & Handover</span>
+              <Plus className="w-3.5 h-3.5" />
+              <span>Daily Cost</span>
             </button>
+
+            <button
+              onClick={() => setActiveTab('deposits')}
+              id="btn-quick-deposit"
+              className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5 text-slate-500" />
+              <span>Deposit</span>
+            </button>
+
+            {/* PDF Reports Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                id="btn-header-pdf-reports-menu"
+                onClick={() => setOpenHeaderMenu(prev => (prev === 'pdfs' ? null : 'pdfs'))}
+                className={`flex items-center justify-center gap-1.5 font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
+                  openHeaderMenu === 'pdfs'
+                    ? 'bg-slate-800 text-white'
+                    : 'bg-slate-900 hover:bg-slate-800 text-white'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5 text-emerald-400" />
+                <span>PDF Reports</span>
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${openHeaderMenu === 'pdfs' ? 'rotate-180' : ''}`} />
+              </button>
+
+              {openHeaderMenu === 'pdfs' && (
+                <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200/90 rounded-xl shadow-xl py-1.5 z-40 animate-scaleIn">
+                  <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                    Export Statements
+                  </div>
+                  <button
+                    type="button"
+                    id="btn-manager-meal-sheet-pdf"
+                    onClick={() => {
+                      setOpenHeaderMenu(null);
+                      setShowMealSheetModal(true);
+                    }}
+                    className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-slate-50 cursor-pointer transition-colors"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                    <div>
+                      <div className="text-xs font-semibold text-slate-900">Meal Sheet PDF</div>
+                      <div className="text-[11px] text-slate-500">31-day attendance sorted by room</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    id="btn-manager-deposit-statement-pdf"
+                    onClick={() => {
+                      setOpenHeaderMenu(null);
+                      setShowDepositStatementModal(true);
+                    }}
+                    className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-slate-50 cursor-pointer transition-colors"
+                  >
+                    <DollarSign className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                    <div>
+                      <div className="text-xs font-semibold text-slate-900">Deposit Statement PDF</div>
+                      <div className="text-[11px] text-slate-500">All boarders cash & advance ledger</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    id="btn-manager-generate-pdf"
+                    onClick={() => {
+                      setOpenHeaderMenu(null);
+                      setShowPdfModal(true);
+                    }}
+                    className="w-full flex items-start gap-2.5 px-3 py-2.5 text-left hover:bg-slate-50 cursor-pointer transition-colors"
+                  >
+                    <FileText className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                    <div>
+                      <div className="text-xs font-semibold text-slate-900">Financial Audit PDF</div>
+                      <div className="text-[11px] text-slate-500">Month-end vouchers & meal rate</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Operations Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                id="btn-header-operations-menu"
+                onClick={() => setOpenHeaderMenu(prev => (prev === 'tools' ? null : 'tools'))}
+                className={`flex items-center justify-center gap-1.5 border font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
+                  openHeaderMenu === 'tools'
+                    ? 'bg-slate-100 text-slate-900 border-slate-300'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                }`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
+                <span>Operations</span>
+                {monthSpecialMeals.length > 0 && (
+                  <span className="bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md font-mono tabular-nums leading-none">
+                    {monthSpecialMeals.length}
+                  </span>
+                )}
+                <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${openHeaderMenu === 'tools' ? 'rotate-180' : ''}`} />
+              </button>
+
+              {openHeaderMenu === 'tools' && (
+                <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200/90 rounded-xl shadow-xl py-1.5 z-40 animate-scaleIn">
+                  <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                    Manager Tools
+                  </div>
+
+                  <button
+                    type="button"
+                    id="btn-manager-special-meal"
+                    onClick={() => {
+                      setOpenHeaderMenu(null);
+                      setShowSpecialMealModal(true);
+                    }}
+                    className="w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-purple-50/70 cursor-pointer transition-colors"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <UtensilsCrossed className="w-4 h-4 text-purple-600 shrink-0" />
+                      <span className="text-xs font-semibold text-slate-900">Special Feast</span>
+                    </span>
+                    {monthSpecialMeals.length > 0 && (
+                      <span className="bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md font-mono tabular-nums leading-none">
+                        {monthSpecialMeals.length}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    id="btn-manager-quick-analytics"
+                    onClick={() => {
+                      setOpenHeaderMenu(null);
+                      setActiveTab('analytics');
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-50 cursor-pointer transition-colors"
+                  >
+                    <BarChart3 className="w-4 h-4 text-blue-600 shrink-0" />
+                    <span className="text-xs font-semibold text-slate-900">Analytics & Trends</span>
+                  </button>
+
+                  {onOpenHandoverModal && (
+                    <button
+                      type="button"
+                      id="btn-manager-handover"
+                      onClick={() => {
+                        setOpenHeaderMenu(null);
+                        onOpenHandoverModal();
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-emerald-50/80 cursor-pointer transition-colors"
+                    >
+                      <ArrowRightLeft className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span className="text-xs font-semibold text-emerald-800">Close Month & Handover</span>
+                    </button>
+                  )}
+
+                  <div className="my-1 border-t border-slate-100" />
+
+                  <button
+                    type="button"
+                    id="btn-manager-quick-pin"
+                    onClick={() => {
+                      setOpenHeaderMenu(null);
+                      setDashboardPinInput('');
+                      setDashboardPinSuccess(false);
+                      setShowPinModal(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-slate-50 cursor-pointer transition-colors"
+                  >
+                    <KeyRound className="w-4 h-4 text-slate-500 shrink-0" />
+                    <span className="text-xs font-semibold text-slate-700">Security PIN</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile Compact Quick Bar (Full options also inside top Menu Bar) */}
+          <div className="flex md:hidden items-center gap-2 w-full">
+            <button
+              type="button"
+              onClick={() => setActiveTab('bazaar')}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer whitespace-nowrap"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Cost</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('deposits')}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer whitespace-nowrap"
+            >
+              <Plus className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Deposit</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setOpenHeaderMenu(prev => (prev === 'mobile-more' ? null : 'mobile-more'))}
+              className="flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Options</span>
+              <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${openHeaderMenu === 'mobile-more' ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+
+          {/* Mobile Quick Options Popover */}
+          {openHeaderMenu === 'mobile-more' && (
+            <div className="md:hidden absolute right-0 left-0 mt-2 bg-white border border-slate-200/90 rounded-xl shadow-xl py-2 z-40 animate-scaleIn">
+              <div className="px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Export PDF Reports
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenHeaderMenu(null);
+                  setShowMealSheetModal(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-slate-50 text-xs font-semibold text-slate-800 cursor-pointer"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Meal Sheet PDF (By Room)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenHeaderMenu(null);
+                  setShowDepositStatementModal(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-slate-50 text-xs font-semibold text-slate-800 cursor-pointer"
+              >
+                <DollarSign className="w-4 h-4 text-amber-600 shrink-0" />
+                <span>Deposit Statement PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenHeaderMenu(null);
+                  setShowPdfModal(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-slate-50 text-xs font-semibold text-slate-800 cursor-pointer"
+              >
+                <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                <span>Financial Audit PDF</span>
+              </button>
+
+              <div className="my-1.5 border-t border-slate-100" />
+              <div className="px-3.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Operations
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenHeaderMenu(null);
+                  setShowSpecialMealModal(true);
+                }}
+                className="w-full flex items-center justify-between px-3.5 py-2.5 text-left hover:bg-purple-50 text-xs font-semibold text-slate-800 cursor-pointer"
+              >
+                <span className="flex items-center gap-2.5">
+                  <UtensilsCrossed className="w-4 h-4 text-purple-600 shrink-0" />
+                  <span>Special Feast</span>
+                </span>
+                {monthSpecialMeals.length > 0 && (
+                  <span className="bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md font-mono tabular-nums">
+                    {monthSpecialMeals.length}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenHeaderMenu(null);
+                  setActiveTab('analytics');
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-slate-50 text-xs font-semibold text-slate-800 cursor-pointer"
+              >
+                <BarChart3 className="w-4 h-4 text-blue-600 shrink-0" />
+                <span>Analytics & Trends</span>
+              </button>
+              {onOpenHandoverModal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOpenHeaderMenu(null);
+                    onOpenHandoverModal();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-emerald-50 text-xs font-semibold text-emerald-800 cursor-pointer"
+                >
+                  <ArrowRightLeft className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Close Month & Handover</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenHeaderMenu(null);
+                  setDashboardPinInput('');
+                  setDashboardPinSuccess(false);
+                  setShowPinModal(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer"
+              >
+                <KeyRound className="w-4 h-4 text-slate-500 shrink-0" />
+                <span>Security PIN</span>
+              </button>
+            </div>
           )}
-
-          <button
-            onClick={() => setActiveTab('analytics')}
-            id="btn-manager-quick-analytics"
-            className={`flex items-center justify-center gap-1.5 font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0 ${
-              activeTab === 'analytics'
-                ? 'bg-slate-900 text-white'
-                : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
-            }`}
-            title="Open Executive Analytics & Intelligence Dashboard"
-          >
-            <BarChart3 className={`w-3.5 h-3.5 ${activeTab === 'analytics' ? 'text-blue-400' : 'text-slate-500'}`} />
-            <span>Analytics</span>
-          </button>
-
-          <button
-            onClick={() => setShowMealSheetModal(true)}
-            id="btn-manager-meal-sheet-pdf"
-            className="flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
-            title="Generate and export the monthly 31-day meal sheet for all boarders"
-          >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Meal Sheet PDF</span>
-          </button>
-
-          <button
-            onClick={() => setShowDepositStatementModal(true)}
-            id="btn-manager-deposit-statement-pdf"
-            className="flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
-            title="Generate and download deposit statement PDF of all boarders"
-          >
-            <DollarSign className="w-3.5 h-3.5 text-amber-400" />
-            <span>Deposit PDF</span>
-          </button>
-
-          <button
-            onClick={() => setShowPdfModal(true)}
-            id="btn-manager-generate-pdf"
-            className="flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
-          >
-            <FileText className="w-3.5 h-3.5 text-blue-400" />
-            <span>Financial PDF</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setDashboardPinInput('');
-              setDashboardPinSuccess(false);
-              setShowPinModal(true);
-            }}
-            id="btn-manager-quick-pin"
-            className="flex items-center justify-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0 border border-slate-200"
-            title="Manage Security PIN"
-          >
-            <KeyRound className="w-3.5 h-3.5 text-slate-500" />
-            <span>Security PIN</span>
-          </button>
         </div>
       </div>
 
