@@ -42,6 +42,7 @@ import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSet
 import { getDatesInMonth, formatReadableDate, formatReadableMonth, didBoarderEatBreakfast, getBoarderMealBreakdown } from '../utils';
 import PrintablePdfReportModal from './PrintablePdfReportModal';
 import BoarderMealSheetModal from './BoarderMealSheetModal';
+import DepositStatementModal from './DepositStatementModal';
 import BreakfastAuditModal from './BreakfastAuditModal';
 import SpecialMealModal from './SpecialMealModal';
 import RecentActivitiesSection from './RecentActivitiesSection';
@@ -98,6 +99,7 @@ export default function ManagerDashboard({
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [showMealSheetModal, setShowMealSheetModal] = useState(false);
+  const [showDepositStatementModal, setShowDepositStatementModal] = useState(false);
   const [showBreakfastAuditModal, setShowBreakfastAuditModal] = useState(false);
   const [showSpecialMealModal, setShowSpecialMealModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
@@ -1135,6 +1137,16 @@ export default function ManagerDashboard({
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
             <span>Meal Sheet PDF</span>
+          </button>
+
+          <button
+            onClick={() => setShowDepositStatementModal(true)}
+            id="btn-manager-deposit-statement-pdf"
+            className="flex items-center justify-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-3 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
+            title="Generate and download deposit statement PDF of all boarders"
+          >
+            <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+            <span>Deposit PDF</span>
           </button>
 
           <button
@@ -2683,30 +2695,42 @@ export default function ManagerDashboard({
                 </p>
               </div>
 
-              {/* Scope Switcher */}
-              <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setDepositFilterScope('month')}
-                  className={`px-3 py-1 font-medium rounded-md transition-colors cursor-pointer text-xs ${
-                    depositFilterScope === 'month'
-                      ? 'bg-white text-blue-600 shadow-2xs font-bold'
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
+                  onClick={() => setShowDepositStatementModal(true)}
+                  id="btn-deposits-tab-pdf"
+                  className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-3 py-1.5 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
                 >
-                  This Month ({formatReadableMonth(settings.currentMonth)})
+                  <FileText className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Deposit Statement PDF</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setDepositFilterScope('all')}
-                  className={`px-3 py-1 font-medium rounded-md transition-colors cursor-pointer text-xs ${
-                    depositFilterScope === 'all'
-                      ? 'bg-white text-blue-600 shadow-2xs font-bold'
-                      : 'text-slate-500 hover:text-slate-800'
-                  }`}
-                >
-                  All Deposits ({deposits.length})
-                </button>
+
+                {/* Scope Switcher */}
+                <div className="inline-flex rounded-lg border border-slate-200 p-0.5 bg-slate-50 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setDepositFilterScope('month')}
+                    className={`px-3 py-1 font-medium rounded-md transition-colors cursor-pointer text-xs ${
+                      depositFilterScope === 'month'
+                        ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    This Month ({formatReadableMonth(settings.currentMonth)})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDepositFilterScope('all')}
+                    className={`px-3 py-1 font-medium rounded-md transition-colors cursor-pointer text-xs ${
+                      depositFilterScope === 'all'
+                        ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                  >
+                    All Deposits ({deposits.length})
+                  </button>
+                </div>
               </div>
             </div>
             
@@ -3611,6 +3635,16 @@ export default function ManagerDashboard({
         onClose={() => setShowMealSheetModal(false)}
         boarders={boarders}
         mealLogs={mealLogs}
+        settings={settings}
+        report={report}
+      />
+
+      {/* All Boarders Deposit Statement PDF Modal */}
+      <DepositStatementModal
+        isOpen={showDepositStatementModal}
+        onClose={() => setShowDepositStatementModal(false)}
+        boarders={boarders}
+        deposits={deposits}
         settings={settings}
         report={report}
       />

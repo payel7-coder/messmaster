@@ -24,6 +24,7 @@ import { Boarder, Deposit, DailyMealLog, BazaarCost, MiscellaneousCosts, MessSet
 import { formatReadableMonth } from '../utils';
 import PrintablePdfReportModal from './PrintablePdfReportModal';
 import BoarderMealSheetModal from './BoarderMealSheetModal';
+import DepositStatementModal from './DepositStatementModal';
 import { generateMonthlyReportPdf } from '../utils/pdfGenerator';
 
 interface MonthEndReportProps {
@@ -62,6 +63,7 @@ export default function MonthEndReport({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [showMealSheetModal, setShowMealSheetModal] = useState(false);
+  const [showDepositStatementModal, setShowDepositStatementModal] = useState(false);
   const hasSpecialFeast = (report.totalSpecialMealCost || 0) > 0;
 
   // State for tracking which boarders' step-by-step calculations are expanded
@@ -205,6 +207,16 @@ export default function MonthEndReport({
               >
                 <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
                 <span>Meal Sheet PDF</span>
+              </button>
+
+              <button
+                onClick={() => setShowDepositStatementModal(true)}
+                id="btn-report-deposit-statement-pdf"
+                className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs px-3.5 py-2 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
+                title="Generate & export deposit statement PDF of all boarders"
+              >
+                <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+                <span>Deposit PDF</span>
               </button>
 
               <button
@@ -732,6 +744,18 @@ export default function MonthEndReport({
           onClose={() => setShowMealSheetModal(false)}
           boarders={boarders}
           mealLogs={mealLogs}
+          settings={settings}
+          report={report}
+        />
+      )}
+
+      {/* All Boarders Deposit Statement PDF Modal - Manager Only */}
+      {isManager && (
+        <DepositStatementModal
+          isOpen={showDepositStatementModal}
+          onClose={() => setShowDepositStatementModal(false)}
+          boarders={boarders}
+          deposits={deposits}
           settings={settings}
           report={report}
         />

@@ -1576,3 +1576,394 @@ export function generatePersonalVoucherPdf(
 
   return doc;
 }
+
+export interface DepositStatementPdfOptions {
+  scope?: 'month' | 'all';
+  includeInactive?: boolean;
+  includeBalanceSummary?: boolean;
+  includeTransactionLog?: boolean;
+  sortBy?: 'room' | 'name' | 'amount';
+  managerName?: string;
+  managerPhone?: string;
+  customNotes?: string;
+}
+
+/**
+ * Generates an All-Boarders Deposit Statement & Collection Register PDF (Portrait A4).
+ * Includes member-wise deposit summary (sorted by room number by default) and optional chronological transaction log.
+ */
+export function generateBoardersDepositStatementPdf(
+  boarders: Boarder[],
+  deposits: Deposit[],
+  settings: MessSettings,
+  report?: MonthReport,
+  options: DepositStatementPdfOptions = {}
+): jsPDF {
+  const {
+    scope = 'month',
+    includeInactive = true,
+    includeBalanceSummary = true,
+    includeTransactionLog = true,
+    sortBy = 'room',
+    managerName = settings.currentManagerName || 'Mess Manager',
+    managerPhone = settings.currentManagerPhone || '',
+    customNotes = 'Verified deposit collection register. Please report any discrepancy within 3 days of publication.',
+  } = options;
+
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  registerBengaliFont(doc);
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const activeMonthStr = formatReadableMonth(settings.currentMonth);
+  const scopeLabel = scope === 'all' ? 'ALL RECORDED MONTHS' : activeMonthStr.toUpperCase();
+
+  const scopedDeposits = (scope === 'all'
+    ? [...deposits]
+    : deposits.filter(d => d.date.startsWith(settings.currentMonth))
+  ).sort((a, b) => b.date.localeCompare(a.date));
+
+  const depositsByBoarder: Record<string, Deposit[]> = {};
+  scopedDeposits.forEach(d => {
+    if (!depositsByBoarder[d.boarderId]) {
+      depositsByBoarder[d.boarderId] = [];
+    }
+    depositsByBoarder[d.boarderId].push(d);
+  });
+
+  const boarderTotals: Record<string, number> = {};
+  boarders.forEach(b => {
+    boarderTotals[b.id] = (depositsByBoarder[b.id] || []).reduce((sum, d) => sum + d.amount, 0);
+  });
+
+  const baseBoarders = includeInactive ? [...boarders] : boarders.filter(b => b.isActive);
+  const sortedBoarders = baseBoarders.sort((a, b) => {
+    if (sortBy === 'amount') {
+      const diff = (boarderTotals[b.id] || 0) - (boarderTotals[a.id] || 0);
+      if (diff !== 0) return diff;
+      return compareBoardersByRoom(a, b);
+    }
+    if (sortBy === 'name') {
+      return a.name.localeCompare(b.name);
+    }
+    return compareBoardersByRoom(a, b);
+  });
+
+  const includedIds = new Set(sortedBoarders.map(b => b.id));
+  const includedTransactions = scopedDeposits.filter(d => includedIds.has(d.boarderId));
+  const grandTotalCollected = sortedBoarders.reduce((sum, b) => sum + (boarderTotals[b.id] || 0), 0);
+  const contributorsCount = sortedBoarders.filter(b => (boarderTotals[b.id] || 0) > 0).length;
+  const showBalanceCol = Boolean(includeBalanceSummary && scope === 'month' && report);
+
+  // Header
+  doc.setTextColor(15, 23, 42);
+  doc.setFont('NotoSansBengali', 'bold');
+  doc.setFontSize(15);
+  doc.text(shapeBengaliText((settings.messName || 'Mess').toUpperCase()), 14, 15);
+
+  doc.setFont('NotoSansBengali', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(71, 85, 105);
+  doc.text(shapeBengaliText(`ALL BOARDERS DEPOSIT STATEMENT & COLLECTION REGISTER - ${scopeLabel}`), 14, 21);
+
+  const now = new Date();
+  const generatedDateStr = `${now.toLocaleDateString('en-GB')} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(shapeBengaliText(`Generated: ${generatedDateStr}`), pageWidth - 14, 21, { align: 'right' });
+
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.35);
+  doc.line(14, 24.5, pageWidth - 14, 24.5);
+
+  // 4 Summary Cards
+  let currentY = 28.5;
+  const cardGap = 3.5;
+  const cardWidth = (pageWidth - 28 - cardGap * 3) / 4;
+  const cardHeight = 13;
+
+  const cards = [
+    { label: 'Total Collected', value: `৳ ${grandTotalCollected.toLocaleString('en-IN')}` },
+    { label: 'Included Boarders', value: `${sortedBoarders.length} members` },
+    { label: 'Deposit Entries', value: `${includedTransactions.length} records` },
+    { label: 'Paid / Contributed', value: `${contributorsCount} / ${sortedBoarders.length}` },
+  ];
+
+  cards.forEach((c, i) => {
+    const x = 14 + i * (cardWidth + cardGap);
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(x, currentY, cardWidth, cardHeight, 1.5, 1.5, 'FD');
+
+    doc.setFont('NotoSansBengali', 'normal');
+    doc.setFontSize(6.8);
+    doc.setTextColor(100, 116, 139);
+    doc.text(shapeBengaliText(c.label), x + 3, currentY + 4.8);
+
+    doc.setFont('NotoSansBengali', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(15, 23, 42);
+    doc.text(shapeBengaliText(c.value), x + 3, currentY + 10.2);
+  });
+
+  currentY += cardHeight + 6;
+
+  // Section 1: Member-Wise Deposit Summary
+  doc.setFont('NotoSansBengali', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text(shapeBengaliText('1. Boarder-Wise Deposit Summary'), 14, currentY);
+  currentY += 3;
+
+  const summaryHead = showBalanceCol
+    ? [['#', 'Room', 'Boarder Name', 'Entries', 'Payment Breakdown', 'Deposited (৳)', 'Net Balance']]
+    : [['#', 'Room', 'Boarder Name', 'Entries', 'Payment Breakdown', 'Deposited (৳)']];
+
+  const summaryRows = sortedBoarders.map((b, idx) => {
+    const bDeps = depositsByBoarder[b.id] || [];
+    const totalDep = boarderTotals[b.id] || 0;
+    const roomLabel = b.roomNo?.trim() || '—';
+    const nameLabel = b.isActive ? b.name : `${b.name} (Inact.)`;
+    const breakdownText = bDeps.length === 0
+      ? 'No deposits recorded'
+      : bDeps
+          .slice(0, 4)
+          .map(d => `${d.date.slice(5)} ৳${d.amount}${d.note ? ` (${d.note})` : ''}`)
+          .join(', ') + (bDeps.length > 4 ? ` +${bDeps.length - 4} more` : '');
+
+    const row: string[] = [
+      String(idx + 1),
+      roomLabel,
+      nameLabel,
+      String(bDeps.length),
+      breakdownText,
+      totalDep > 0 ? totalDep.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00',
+    ];
+
+    if (showBalanceCol && report) {
+      const bSum = report.boardersReport.find(r => r.boarderId === b.id);
+      const bal = bSum ? bSum.balance : 0;
+      row.push(`${bal >= 0 ? '+' : '-'}৳ ${Math.abs(bal).toFixed(0)}`);
+    }
+
+    return row;
+  });
+
+  const summaryFootRow = showBalanceCol
+    ? [
+        '',
+        '',
+        'TOTAL COLLECTED',
+        String(includedTransactions.length),
+        `${contributorsCount} of ${sortedBoarders.length} members deposited`,
+        `৳ ${grandTotalCollected.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        '',
+      ]
+    : [
+        '',
+        '',
+        'TOTAL COLLECTED',
+        String(includedTransactions.length),
+        `${contributorsCount} of ${sortedBoarders.length} members deposited`,
+        `৳ ${grandTotalCollected.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      ];
+
+  const summaryColStyles: Record<number, any> = showBalanceCol
+    ? {
+        0: { cellWidth: 8, halign: 'center' },
+        1: { cellWidth: 16, halign: 'center', fontStyle: 'bold' },
+        2: { cellWidth: 34, fontStyle: 'bold' },
+        3: { cellWidth: 13, halign: 'center' },
+        4: { cellWidth: 64 },
+        5: { cellWidth: 25, halign: 'right', fontStyle: 'bold' },
+        6: { cellWidth: 22, halign: 'right', fontStyle: 'bold' },
+      }
+    : {
+        0: { cellWidth: 9, halign: 'center' },
+        1: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
+        2: { cellWidth: 38, fontStyle: 'bold' },
+        3: { cellWidth: 14, halign: 'center' },
+        4: { cellWidth: 75 },
+        5: { cellWidth: 28, halign: 'right', fontStyle: 'bold' },
+      };
+
+  autoTable(doc, {
+    startY: currentY,
+    head: shapeBengaliTableData(summaryHead),
+    body: shapeBengaliTableData([...summaryRows, summaryFootRow]),
+    theme: 'grid',
+    styles: {
+      font: 'NotoSansBengali',
+      fontSize: 7.4,
+      cellPadding: 2,
+      textColor: [30, 41, 59],
+      lineColor: [226, 232, 240],
+      lineWidth: 0.15,
+    },
+    headStyles: {
+      font: 'NotoSansBengali',
+      fontStyle: 'bold',
+      fillColor: [30, 41, 59],
+      textColor: [255, 255, 255],
+      fontSize: 7.5,
+      halign: 'left',
+    },
+    columnStyles: summaryColStyles,
+    didParseCell: (data) => {
+      if (data.row.index === summaryRows.length) {
+        data.cell.styles.fontStyle = 'bold';
+        data.cell.styles.fillColor = [241, 245, 249];
+        data.cell.styles.textColor = [15, 23, 42];
+      }
+      if (data.section === 'body' && data.column.index === 1 && data.row.index < summaryRows.length) {
+        data.cell.styles.textColor = [37, 99, 235];
+      }
+      if (data.section === 'body' && data.column.index === 5 && data.row.index < summaryRows.length) {
+        const val = parseFloat(String(data.cell.text[0] || '0').replace(/,/g, ''));
+        if (val === 0) {
+          data.cell.styles.textColor = [148, 163, 184];
+        } else {
+          data.cell.styles.textColor = [29, 78, 216];
+        }
+      }
+      if (showBalanceCol && data.section === 'body' && data.column.index === 6 && data.row.index < summaryRows.length) {
+        const txt = String(data.cell.text[0] || '');
+        if (txt.startsWith('-')) {
+          data.cell.styles.textColor = [185, 28, 28];
+        } else if (txt.startsWith('+')) {
+          data.cell.styles.textColor = [21, 128, 61];
+        }
+      }
+    },
+    margin: { left: 14, right: 14 },
+  });
+
+  // @ts-ignore
+  currentY = doc.lastAutoTable?.finalY ? doc.lastAutoTable.finalY + 7 : currentY + 60;
+
+  // Section 2: Chronological Transaction Log (optional)
+  if (includeTransactionLog && includedTransactions.length > 0) {
+    if (currentY > pageHeight - 48) {
+      doc.addPage();
+      currentY = 18;
+    }
+
+    doc.setFont('NotoSansBengali', 'bold');
+    doc.setFontSize(9.5);
+    doc.setTextColor(15, 23, 42);
+    doc.text(shapeBengaliText('2. Chronological Deposit Transaction Log'), 14, currentY);
+    currentY += 3;
+
+    const txRows = includedTransactions.map((dep, idx) => {
+      const b = boarders.find(member => member.id === dep.boarderId);
+      return [
+        String(idx + 1),
+        formatReadableDate(dep.date),
+        b?.roomNo?.trim() || '—',
+        b?.name || 'Unknown Boarder',
+        dep.note || 'Regular cash deposit',
+        dep.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      ];
+    });
+
+    const txFootRow = [
+      '',
+      '',
+      '',
+      'TOTAL TRANSACTIONS',
+      `${includedTransactions.length} payment(s)`,
+      `৳ ${grandTotalCollected.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    ];
+
+    autoTable(doc, {
+      startY: currentY,
+      head: shapeBengaliTableData([['#', 'Date', 'Room', 'Boarder Name', 'Method / Note', 'Amount (৳)']]),
+      body: shapeBengaliTableData([...txRows, txFootRow]),
+      theme: 'striped',
+      styles: {
+        font: 'NotoSansBengali',
+        fontSize: 7.2,
+        cellPadding: 1.8,
+        textColor: [30, 41, 59],
+      },
+      headStyles: {
+        font: 'NotoSansBengali',
+        fontStyle: 'bold',
+        fillColor: [51, 65, 85],
+        textColor: [255, 255, 255],
+        fontSize: 7.4,
+      },
+      columnStyles: {
+        0: { cellWidth: 9, halign: 'center' },
+        1: { cellWidth: 26 },
+        2: { cellWidth: 18, halign: 'center', fontStyle: 'bold' },
+        3: { cellWidth: 42, fontStyle: 'bold' },
+        4: { cellWidth: 59 },
+        5: { cellWidth: 28, halign: 'right', fontStyle: 'bold' },
+      },
+      didParseCell: (data) => {
+        if (data.row.index === txRows.length) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.fillColor = [241, 245, 249];
+          data.cell.styles.textColor = [15, 23, 42];
+        }
+      },
+      margin: { left: 14, right: 14 },
+    });
+
+    // @ts-ignore
+    currentY = doc.lastAutoTable?.finalY ? doc.lastAutoTable.finalY + 7 : currentY + 50;
+  }
+
+  // Notes & Signature Block
+  if (currentY > pageHeight - 36) {
+    doc.addPage();
+    currentY = 20;
+  }
+
+  if (customNotes) {
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, currentY, pageWidth - 28, 10.5, 1.2, 1.2, 'FD');
+    doc.setFont('NotoSansBengali', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(71, 85, 105);
+    doc.text(shapeBengaliText(`Note: ${customNotes}`), 17, currentY + 6.2, { maxWidth: pageWidth - 34 });
+    currentY += 16;
+  }
+
+  const signY = Math.max(currentY + 6, pageHeight - 24);
+  doc.setDrawColor(148, 163, 184);
+  doc.setLineWidth(0.3);
+  doc.line(16, signY, 72, signY);
+  doc.line(pageWidth - 72, signY, pageWidth - 16, signY);
+
+  doc.setFont('NotoSansBengali', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(30, 41, 59);
+  doc.text(shapeBengaliText(`Manager: ${managerName}${managerPhone ? ` (${managerPhone})` : ''}`), 16, signY + 4);
+  doc.text(shapeBengaliText('Cashier / Audit Verification'), pageWidth - 72, signY + 4);
+
+  // Page numbers
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFont('NotoSansBengali', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184);
+    doc.text(
+      shapeBengaliText(`${settings.messName || 'Mess'} • Deposit Statement (${scope === 'all' ? 'All Months' : activeMonthStr}) • Page ${i} of ${totalPages}`),
+      pageWidth / 2,
+      pageHeight - 6,
+      { align: 'center' }
+    );
+  }
+
+  return doc;
+}
+
